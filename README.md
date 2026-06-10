@@ -1,5 +1,7 @@
 # OS
 
+[![Build](https://github.com/javolis/OS/actions/workflows/build.yml/badge.svg)](https://github.com/javolis/OS/actions/workflows/build.yml)
+
 A hobby operating system / kernel, built from scratch.
 
 ## Status

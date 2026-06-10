@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm xorriso grub-pc-bin grub-common mtools unzip
+
+      - name: Install i686-elf cross-compiler
+        run: |
+          curl -L -o toolchain.zip \
+            https://github.com/lordmilko/i686-elf-tools/releases/latest/download/i686-elf-tools-linux.zip
+          mkdir -p "$HOME/cross"
+          unzip -q toolchain.zip -d "$HOME/cross"
+          chmod +x "$HOME/cross/bin/"*
+          echo "$HOME/cross/bin" >> "$GITHUB_PATH"
+
+      - name: Show toolchain version
+        run: i686-elf-gcc --version
+
+      - name: Build kernel
+        run: make
+
+      - name: Build bootable ISO
+        run: make iso
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-iso
+          path: os.iso
