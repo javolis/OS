@@ -15,7 +15,7 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm xorriso grub-pc-bin grub-common mtools unzip
+          sudo apt-get install -y nasm xorriso grub-pc-bin grub-common mtools unzip qemu-system-x86
 
       - name: Install i686-elf cross-compiler
         run: |
@@ -34,6 +34,9 @@ jobs:
 
       - name: Build bootable ISO
         run: make iso
+
+      - name: Smoke test (boot ISO in QEMU)
+        run: make test
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4

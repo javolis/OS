@@ -27,6 +27,7 @@ https://wiki.osdev.org/GCC_Cross-Compiler (recommended over the host gcc).
 make            # build the kernel
 make iso        # produce a bootable os.iso
 make run        # boot the ISO in QEMU
+make test       # headless boot smoke test (asserts the kernel runs)
 make clean
 ```
 

@@ -13,7 +13,7 @@ ISO     := os.iso
 
 OBJ := boot/boot.o kernel/kernel.o
 
-.PHONY: all iso run clean
+.PHONY: all iso run test clean
 
 all: $(KERNEL)
 
@@ -34,6 +34,9 @@ iso: $(KERNEL)
 
 run: iso
 	qemu-system-i386 -cdrom $(ISO)
+
+test: iso
+	bash test/smoke.sh $(ISO)
 
 clean:
 	rm -rf $(OBJ) $(KERNEL) $(ISO) isodir
