@@ -11,7 +11,16 @@ LDFLAGS := -ffreestanding -O2 -nostdlib -T linker.ld
 KERNEL  := kernel.elf
 ISO     := os.iso
 
-OBJ := boot/boot.o kernel/kernel.o
+OBJ := boot/boot.o \
+       kernel/interrupt.o \
+       kernel/gdt.o \
+       kernel/idt.o \
+       kernel/isr.o \
+       kernel/pic.o \
+       kernel/vga.o \
+       kernel/serial.o \
+       kernel/keyboard.o \
+       kernel/kernel.o
 
 .PHONY: all iso run test clean
 

@@ -6,8 +6,10 @@ A hobby operating system / kernel, built from scratch.
 
 ## Status
 
-Early bootstrap. Currently a minimal freestanding i686 kernel that boots via
-the Multiboot protocol (GRUB) and prints to the VGA text buffer.
+Freestanding i686 kernel that boots via the Multiboot protocol (GRUB). It sets
+up its own GDT and IDT, remaps the PIC, handles CPU exceptions, and reads the
+PS/2 keyboard over IRQ1 — typed characters are echoed to both the VGA console
+(with scrolling + hardware cursor) and the serial port.
 
 ## Prerequisites (Linux dev host)
 
@@ -35,8 +37,18 @@ make clean
 
 ```
 boot/        bootstrap assembly (multiboot header, entry point)
-kernel/      kernel C sources
+kernel/      kernel sources
+  interrupt.s  GDT/IDT loaders + ISR/IRQ entry stubs
+  gdt.c        flat segment descriptors
+  idt.c        interrupt descriptor table
+  isr.c        exception + IRQ dispatch
+  pic.c        8259A PIC (remap, EOI)
+  vga.c        VGA text console (scroll + cursor)
+  serial.c     COM1 serial output
+  keyboard.c   PS/2 keyboard driver
+  kernel.c     entry point (kernel_main)
 include/     shared headers
+test/        smoke.sh — headless QEMU boot + keyboard test
 linker.ld    kernel link script
 Makefile     build orchestration
 ```
