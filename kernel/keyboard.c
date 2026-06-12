@@ -1,14 +1,13 @@
 /* keyboard.c — PS/2 keyboard (IRQ1): translate scancode set 1 to ASCII with
- * shift support, echoed to the terminal and serial. Extended (0xE0-prefixed)
- * keys and other modifiers are ignored for now. */
+ * shift support and queue characters for consumers (see keyboard_getchar).
+ * Extended (0xE0-prefixed) keys and other modifiers are ignored for now. */
+#include <stddef.h>
 #include <stdint.h>
 
 #include "io.h"
 #include "irq.h"
 #include "keyboard.h"
 #include "pic.h"
-#include "serial.h"
-#include "term.h"
 
 #define KBD_DATA 0x60
 
@@ -51,6 +50,14 @@ static const char keymap_shift[128] = {
 
 static int shift_held;
 
+/* Ring buffer filled by the IRQ handler and drained by keyboard_getchar().
+ * Single producer (the IRQ) / single consumer (the kernel main loop), so
+ * volatile indexes are sufficient — no locking needed. */
+#define KBD_BUF_SIZE 256
+static char kbd_buf[KBD_BUF_SIZE];
+static volatile size_t kbd_head; /* next write slot (IRQ handler) */
+static volatile size_t kbd_tail; /* next read slot (consumer) */
+
 static void keyboard_irq(struct registers *regs) {
     (void)regs;
     uint8_t scancode = inb(KBD_DATA);
@@ -68,10 +75,26 @@ static void keyboard_irq(struct registers *regs) {
     }
 
     char c = shift_held ? keymap_shift[scancode] : keymap[scancode];
-    if (c) {
-        term_putchar(c);
-        serial_putchar(c);
-    }
+    if (!c)
+        return;
+
+    size_t next = (kbd_head + 1) % KBD_BUF_SIZE;
+    if (next == kbd_tail)
+        return; /* buffer full: drop the keystroke */
+    kbd_buf[kbd_head] = c;
+    kbd_head = next;
+}
+
+char keyboard_getchar(void) {
+    /* hlt until any interrupt arrives. If a keystroke races in between the
+     * emptiness check and the hlt, the 100 Hz timer still wakes us within
+     * 10 ms to re-check, so this can't deadlock. */
+    while (kbd_tail == kbd_head)
+        __asm__ volatile("hlt");
+
+    char c = kbd_buf[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
+    return c;
 }
 
 void keyboard_init(void) {

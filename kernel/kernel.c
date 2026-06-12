@@ -6,6 +6,7 @@
 #include "kprintf.h"
 #include "pic.h"
 #include "serial.h"
+#include "shell.h"
 #include "term.h"
 #include "timer.h"
 
@@ -44,12 +45,10 @@ void kernel_main(void) {
     kprintf("Boot succeeded.\n");
 
     /* Exits QEMU only when the isa-debug-exit device is present. Neither
-     * the smoke test nor `make run` adds it (the smoke test types at the
-     * idle kernel via the QEMU monitor), so normally this is a no-op and
-     * we idle below, echoing keystrokes via the keyboard IRQ. */
+     * the smoke test nor `make run` adds it (the smoke test types shell
+     * commands via the QEMU monitor), so normally this is a no-op and we
+     * drop into the shell below. */
     qemu_exit(0);
 
-    kprintf("Type away; keys echo:\n");
-    for (;;)
-        __asm__ volatile("hlt");
+    shell_run();
 }
