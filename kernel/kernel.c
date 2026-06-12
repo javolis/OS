@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "kprintf.h"
 #include "multiboot.h"
+#include "paging.h"
 #include "pic.h"
 #include "pmm.h"
 #include "serial.h"
@@ -44,6 +45,10 @@ void kernel_main(uint32_t magic, const struct multiboot_info *mbi) {
     pmm_init(mbi);
     kprintf("Memory: %lu MiB usable (%lu of %lu frames).\n",
             pmm_free_frames() / 256, pmm_free_frames(), pmm_total_frames());
+
+    paging_init();
+    kprintf("Paging enabled: %lu MiB identity-mapped.\n",
+            pmm_total_frames() / 256);
 
     /* Prove the IDT actually works: int3 lands in isr_handler (which prints
      * and resumes). If interrupt dispatch is broken we fault here and never
