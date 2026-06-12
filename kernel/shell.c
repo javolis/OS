@@ -210,14 +210,15 @@ void shell_run(void) {
                 if (!img) {
                     kprintf("run: %s: not found (try 'ls')\n", fname);
                 } else {
-                    int pid = process_spawn(img, img + size, rest);
+                    /* Foreground is assigned inside spawn, atomically with
+                     * the task becoming runnable; exit hands it back. */
+                    int pid = process_spawn(img, img + size, rest,
+                                            !background);
                     if (pid < 0) {
                         kprintf("run: %s: spawn failed\n", fname);
                     } else if (!background) {
-                        sched_set_foreground((uint32_t)pid);
                         while (sched_pid_alive((uint32_t)pid))
                             __asm__ volatile("hlt");
-                        sched_set_foreground(0);
                         sched_reap();
                     }
                 }

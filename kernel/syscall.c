@@ -159,11 +159,12 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1;
             return;
         }
-        int pid = process_spawn(img, img + size, cmdline);
-        if (pid > 0 && regs->ecx == 1 &&
-            sched_current_pid() == sched_foreground_pid())
-            sched_set_foreground((uint32_t)pid);
-        regs->eax = (uint32_t)pid;
+        /* Foreground handoff happens inside spawn, atomically with the
+         * child becoming runnable — it may run before we return. */
+        int make_fg = (regs->ecx == 1 &&
+                       sched_current_pid() == sched_foreground_pid());
+        regs->eax = (uint32_t)process_spawn(img, img + size, cmdline,
+                                            make_fg);
         return;
     }
 
