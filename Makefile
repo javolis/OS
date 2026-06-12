@@ -18,7 +18,7 @@ HDRS := $(wildcard include/*.h)
 # Userland: standalone ELF executables, shipped to the kernel in a USTAR
 # initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
-             user/crash.elf user/echo.elf
+             user/crash.elf user/echo.elf user/greet.elf
 INITRD    := initrd.tar
 
 .PHONY: all iso run test clean

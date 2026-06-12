@@ -10,3 +10,6 @@ void keyboard_init(void);
 
 /* Blocking read of the next queued character (requires interrupts enabled). */
 char keyboard_getchar(void);
+
+/* Non-blocking: next queued character as unsigned, or -1 if none. */
+int keyboard_trygetchar(void);

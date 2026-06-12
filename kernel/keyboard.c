@@ -8,6 +8,7 @@
 #include "irq.h"
 #include "keyboard.h"
 #include "pic.h"
+#include "sched.h"
 
 #define KBD_DATA 0x60
 
@@ -65,6 +66,7 @@ static void push(char c) {
         return; /* buffer full: drop the keystroke */
     kbd_buf[kbd_head] = c;
     kbd_head = next;
+    sched_wake_keyboard(); /* unblock tasks waiting in sys_readline */
 }
 
 static void keyboard_irq(struct registers *regs) {
@@ -103,16 +105,22 @@ static void keyboard_irq(struct registers *regs) {
         push(c);
 }
 
+int keyboard_trygetchar(void) {
+    if (kbd_tail == kbd_head)
+        return -1;
+    char c = kbd_buf[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
+    return (unsigned char)c;
+}
+
 char keyboard_getchar(void) {
     /* hlt until any interrupt arrives. If a keystroke races in between the
      * emptiness check and the hlt, the 100 Hz timer still wakes us within
      * 10 ms to re-check, so this can't deadlock. */
-    while (kbd_tail == kbd_head)
+    int c;
+    while ((c = keyboard_trygetchar()) < 0)
         __asm__ volatile("hlt");
-
-    char c = kbd_buf[kbd_tail];
-    kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
-    return c;
+    return (char)c;
 }
 
 void keyboard_init(void) {

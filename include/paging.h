@@ -17,6 +17,9 @@ void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys,
 /* Physical frame backing `virt` in the given address space, 0 if unmapped. */
 uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt);
 
+/* Raw PTE for `virt` (flags + frame), or 0 if not present. */
+uint32_t paging_get_pte(uint32_t dir_phys, uint32_t virt);
+
 /* Physical address of the currently loaded page directory (CR3). */
 uint32_t paging_active_directory(void);
 

@@ -38,13 +38,15 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                s l e e p spc 5 0 ret \
                up up up up ret \
                r u n spc h e l l o shift-minus a dot e l f ret \
-               r u n spc c l o c k dot e l f ret \
+               r u n spc c l o c k dot e l f spc shift-7 ret \
                p s ret \
                r u n spc c r a s h dot e l f ret \
                e c h o spc s u r v i v e d ret \
                r u n spc e c h o dot e l f spc p r o o f spc o f spc a r g v ret \
-               r u n spc c l o c k dot e l f ret \
-               k i l l spc 7 ret; do
+               r u n spc c l o c k dot e l f spc shift-7 ret \
+               k i l l spc 7 ret \
+               r u n spc g r e e t dot e l f ret \
+               c i ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -219,6 +221,16 @@ if grep -q "killed pid 7" "$SERIAL_LOG" && [ "$done_count" -eq 1 ]; then
     echo "PASS: kill stopped a running process (done seen ${done_count}x)"
 else
     echo "FAIL: kill did not stop the process (done seen ${done_count}x)" >&2
+    fail=1
+fi
+
+# Interactive input: greet.elf runs in the foreground, owns the keyboard,
+# and reads a typed name through sys_readline.
+if grep -q "What is your name" "$SERIAL_LOG" \
+        && grep -q "Hello, ci!" "$SERIAL_LOG"; then
+    echo "PASS: user program read keyboard input via sys_readline"
+else
+    echo "FAIL: greet did not read keyboard input" >&2
     fail=1
 fi
 

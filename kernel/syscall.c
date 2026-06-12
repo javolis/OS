@@ -1,11 +1,14 @@
 /* syscall.c — int 0x80 system call dispatch. */
 #include <stdint.h>
 
+#include "keyboard.h"
 #include "kprintf.h"
 #include "memlayout.h"
 #include "paging.h"
 #include "sched.h"
+#include "serial.h"
 #include "syscall.h"
+#include "term.h"
 
 #define SYS_WRITE_MAX 1024
 
@@ -27,6 +30,62 @@ static int user_string_ok(uint32_t addr) {
             return 1;
     }
     return 0; /* no NUL within the cap */
+}
+
+/* Every page of [addr, addr+len) must be a present, writable, user page
+ * in the caller's address space. */
+static int user_range_writable(uint32_t addr, uint32_t len) {
+    if (len == 0 || addr + len < addr || addr + len > KERNEL_VIRT_BASE)
+        return 0;
+    uint32_t dir = paging_active_directory();
+    for (uint32_t a = addr & ~0xFFFu; a < addr + len; a += 4096) {
+        uint32_t pte = paging_get_pte(dir, a);
+        if (!(pte & 0x1) || !(pte & 0x2) || !(pte & 0x4))
+            return 0; /* present | writable | user */
+    }
+    return 1;
+}
+
+/* Next keyboard character for a syscall context: blocks the TASK (not the
+ * CPU) when the buffer is empty. IF is off here, so the check-then-block
+ * sequence cannot lose a wakeup. */
+static char task_getchar(void) {
+    for (;;) {
+        int c = keyboard_trygetchar();
+        if (c >= 0)
+            return (char)c;
+        sched_block_on_keyboard();
+    }
+}
+
+/* Line-disciplined read into a user buffer: echo, backspace editing,
+ * returns on Enter. The caller's address space is active, so the buffer
+ * is written through its own user mapping. */
+static uint32_t do_readline(char *dst, uint32_t max) {
+    uint32_t len = 0;
+    for (;;) {
+        char c = task_getchar();
+        if (c == '\n') {
+            kprintf("\n");
+            break;
+        }
+        if (c == '\b') {
+            if (len > 0) {
+                len--;
+                term_putchar('\b');
+                serial_write("\b \b");
+            }
+            continue;
+        }
+        if ((unsigned char)c >= 0x80)
+            continue; /* arrows etc.: no history in user readline yet */
+        if (len + 1 < max) {
+            dst[len++] = c;
+            kprintf("%c", c);
+        }
+    }
+    dst[len] = '\0';
+    return len;
 }
 
 void syscall_handle(struct registers *regs) {
@@ -55,6 +114,17 @@ void syscall_handle(struct registers *regs) {
     case SYS_GETPID:
         regs->eax = sched_current_pid();
         return;
+
+    case SYS_READLINE: {
+        /* Only the foreground task may read the keyboard. */
+        if (sched_current_pid() != sched_foreground_pid() ||
+            !user_range_writable(regs->ebx, regs->ecx)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = do_readline((char *)regs->ebx, regs->ecx);
+        return;
+    }
 
     default:
         regs->eax = (uint32_t)-1;

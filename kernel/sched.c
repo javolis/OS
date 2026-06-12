@@ -24,7 +24,13 @@
 #define MAX_TASKS 8
 #define KSTACK_SIZE 8192u
 
-enum task_state { TASK_FREE = 0, TASK_READY, TASK_BLOCKED, TASK_ZOMBIE };
+enum task_state {
+    TASK_FREE = 0,
+    TASK_READY,
+    TASK_BLOCKED, /* sleeping until wake_at */
+    TASK_WAITKBD, /* blocked on keyboard input */
+    TASK_ZOMBIE,
+};
 
 struct task {
     volatile enum task_state state;
@@ -43,6 +49,7 @@ static struct task *current;
 static volatile int preempt_on;
 static uint32_t switch_count;
 static uint32_t next_pid = 1;
+static volatile uint32_t fg_pid; /* keyboard owner; 0 = kernel shell */
 
 /* boot/usermode.s */
 extern void switch_context(uint32_t *save_esp, uint32_t new_esp);
@@ -153,6 +160,38 @@ void sched_sleep_current(uint32_t nticks) {
     schedule();
 }
 
+/* Block the calling task until the keyboard IRQ delivers input. Syscall
+ * context only: IF is off, so no keystroke can slip in between the
+ * caller's buffer check and this block — no lost-wakeup race. */
+void sched_block_on_keyboard(void) {
+    current->state = TASK_WAITKBD;
+    schedule();
+}
+
+/* Called from the keyboard IRQ whenever a character is queued. */
+void sched_wake_keyboard(void) {
+    for (int i = 1; i < MAX_TASKS; i++)
+        if (tasks[i].state == TASK_WAITKBD)
+            tasks[i].state = TASK_READY;
+}
+
+void sched_set_foreground(uint32_t pid) {
+    fg_pid = pid;
+}
+
+uint32_t sched_foreground_pid(void) {
+    return fg_pid;
+}
+
+int sched_pid_alive(uint32_t pid) {
+    for (int i = 1; i < MAX_TASKS; i++)
+        if (tasks[i].pid == pid &&
+            (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
+             tasks[i].state == TASK_WAITKBD))
+            return 1;
+    return 0;
+}
+
 uint32_t sched_current_pid(void) {
     return current->pid;
 }
@@ -162,9 +201,12 @@ uint32_t sched_current_pid(void) {
  * the shell is the running task, so the target is always off-CPU. */
 int sched_kill(uint32_t pid) {
     for (int i = 1; i < MAX_TASKS; i++) {
-        if (tasks[i].pid == pid && (tasks[i].state == TASK_READY ||
-                                    tasks[i].state == TASK_BLOCKED)) {
+        if (tasks[i].pid == pid &&
+            (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
+             tasks[i].state == TASK_WAITKBD)) {
             tasks[i].state = TASK_ZOMBIE;
+            if (fg_pid == pid)
+                fg_pid = 0; /* keyboard back to the kernel shell */
             return 0;
         }
     }
@@ -173,7 +215,7 @@ int sched_kill(uint32_t pid) {
 
 void sched_ps(void) {
     static const char *const names[] = {"free", "ready", "blocked",
-                                        "zombie"};
+                                        "waitkbd", "zombie"};
     kprintf("  PID  STATE\n");
     for (int i = 0; i < MAX_TASKS; i++) {
         if (i != 0 && tasks[i].state == TASK_FREE)
@@ -218,6 +260,8 @@ void sched_reap(void) {
 
 void task_exit(void) {
     kprintf("[pid %lu] exited\n", current->pid);
+    if (fg_pid == current->pid)
+        fg_pid = 0; /* keyboard back to the kernel shell */
     current->state = TASK_ZOMBIE;
     schedule(); /* never returns: zombies aren't picked again */
     for (;;)

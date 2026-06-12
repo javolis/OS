@@ -176,8 +176,25 @@ void shell_run(void) {
             initrd_list();
         else if (streq(cmd, "run")) {
             if (*rest == '\0') {
-                kprintf("usage: run <file> [args...] (see 'ls')\n");
+                kprintf("usage: run <file> [args...] [&] (see 'ls')\n");
             } else {
+                /* A trailing '&' runs the program in the background;
+                 * otherwise the shell waits and the program gets the
+                 * keyboard (foreground, Unix-style). */
+                int background = 0;
+                uint32_t end = 0;
+                while (rest[end])
+                    end++;
+                while (end > 0 && rest[end - 1] == ' ')
+                    end--;
+                if (end > 0 && rest[end - 1] == '&') {
+                    background = 1;
+                    end--;
+                    while (end > 0 && rest[end - 1] == ' ')
+                        end--;
+                }
+                rest[end] = '\0';
+
                 /* First word is the file name; the full rest (file name
                  * included) becomes the program's argv. */
                 char fname[32];
@@ -190,10 +207,20 @@ void shell_run(void) {
 
                 uint32_t size;
                 const char *img = initrd_find(fname, &size);
-                if (!img)
+                if (!img) {
                     kprintf("run: %s: not found (try 'ls')\n", fname);
-                else if (process_spawn(img, img + size, rest) < 0)
-                    kprintf("run: %s: spawn failed\n", fname);
+                } else {
+                    int pid = process_spawn(img, img + size, rest);
+                    if (pid < 0) {
+                        kprintf("run: %s: spawn failed\n", fname);
+                    } else if (!background) {
+                        sched_set_foreground((uint32_t)pid);
+                        while (sched_pid_alive((uint32_t)pid))
+                            __asm__ volatile("hlt");
+                        sched_set_foreground(0);
+                        sched_reap();
+                    }
+                }
             }
         } else if (streq(cmd, "kill")) {
             uint32_t pid;
