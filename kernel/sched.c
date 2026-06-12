@@ -221,6 +221,16 @@ uint32_t sched_foreground_pid(void) {
     return fg_pid;
 }
 
+uint32_t sched_alive_count(void) {
+    uint32_t n = 0;
+    for (int i = 1; i < MAX_TASKS; i++)
+        if (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
+            tasks[i].state == TASK_WAITKBD ||
+            tasks[i].state == TASK_WAITPID)
+            n++;
+    return n;
+}
+
 int sched_pid_alive(uint32_t pid) {
     for (int i = 1; i < MAX_TASKS; i++)
         if (tasks[i].pid == pid &&

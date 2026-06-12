@@ -51,7 +51,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc u s h dot e l f ret \
                e c h o dot e l f spc h i spc f r o m spc u s h ret \
                e x i t ret \
-               e c h o spc b a c k ret; do
+               e c h o spc b a c k ret \
+               r u n spc s y s i n f o dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -268,6 +269,14 @@ if [ -n "$bye_line" ] && [ -n "$back_line" ] && [ "$bye_line" -lt "$back_line" ]
     echo "PASS: kernel shell regained the keyboard after ush exited"
 else
     echo "FAIL: kernel shell did not regain the keyboard" >&2
+    fail=1
+fi
+
+# User libc: sysinfo.elf formats live kernel stats with uprintf.
+if grep -qE "sysinfo: ticks=[0-9]+ frames=[0-9]+/[0-9]+ tasks=[0-9]+" "$SERIAL_LOG"; then
+    echo "PASS: user libc formatted sysinfo output"
+else
+    echo "FAIL: sysinfo output missing or malformed" >&2
     fail=1
 fi
 

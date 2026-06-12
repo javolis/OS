@@ -17,5 +17,14 @@
                         * to pass the foreground on (caller must own it);
                         * returns child pid or -1 */
 #define SYS_WAIT 6     /* ebx = pid; blocks until it exits */
+#define SYS_SYSINFO 7  /* ebx = struct sysinfo* (user, writable) */
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct sysinfo {
+    uint32_t ticks;        /* PIT ticks since boot (100 Hz) */
+    uint32_t free_frames;  /* physical memory */
+    uint32_t total_frames;
+    uint32_t tasks_alive;  /* live user tasks, caller included */
+};
 
 void syscall_handle(struct registers *regs);
