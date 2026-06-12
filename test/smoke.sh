@@ -202,9 +202,10 @@ else
     fail=1
 fi
 
-# argv round trip: echo.elf prints exactly its arguments on their own
-# line (the typed command itself appears only with the '> run ' prefix).
-if grep -q "^proof of argv" "$SERIAL_LOG"; then
+# argv round trip: echo.elf prints its arguments. Exclude the typed
+# command line itself; the program's output may share a line with the
+# shell's next prompt, so don't anchor to line start.
+if grep -v "run echo" "$SERIAL_LOG" | grep -q "proof of argv"; then
     echo "PASS: argc/argv reached the user program"
 else
     echo "FAIL: echo.elf did not print its arguments" >&2
