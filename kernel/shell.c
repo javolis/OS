@@ -5,6 +5,7 @@
 
 #include "keyboard.h"
 #include "kprintf.h"
+#include "pmm.h"
 #include "serial.h"
 #include "shell.h"
 #include "term.h"
@@ -73,13 +74,17 @@ void shell_run(void) {
             continue;
 
         if (streq(cmd, "help"))
-            kprintf("commands: help echo clear ticks\n");
+            kprintf("commands: help echo clear ticks meminfo\n");
         else if (streq(cmd, "echo"))
             kprintf("%s\n", rest);
         else if (streq(cmd, "clear"))
             term_init();
         else if (streq(cmd, "ticks"))
             kprintf("%lu ticks since boot (100 Hz)\n", timer_ticks());
+        else if (streq(cmd, "meminfo"))
+            kprintf("%lu/%lu frames free (%lu/%lu MiB)\n", pmm_free_frames(),
+                    pmm_total_frames(), pmm_free_frames() / 256,
+                    pmm_total_frames() / 256);
         else
             kprintf("unknown command: %s (try 'help')\n", cmd);
     }
