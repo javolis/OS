@@ -2,32 +2,62 @@
 ;
 ; Copied by the kernel into user-mapped pages and executed in ring 3, so
 ; they must be position-independent (the call/pop trick recovers the load
-; address). They speak to the kernel only via int 0x80. Both are mapped at
-; the same virtual address — in different address spaces.
+; address). Each prints its message three times with a CPU-bound spin in
+; between — long enough that the PIT preempts mid-spin and the two
+; programs' output interleaves.
+
+SPIN_ITERATIONS equ 10000000
 
 section .text
 
-%macro USER_PROG 2             ; %1 = label prefix, %2 = message label
-global %1_start
-global %1_end
-%1_start:
-    call %%here                ; push the address of %%here
-%%here:
-    pop ebx
-    add ebx, %2 - %%here       ; ebx = runtime address of the message
-    mov eax, 1                 ; SYS_WRITE(string)
+global user_prog_a_start
+global user_prog_a_end
+user_prog_a_start:
+    call .here
+.here:
+    pop edi
+    add edi, msg_a - .here     ; edi = runtime address of the message
+    mov esi, 3                 ; iterations
+.loop:
+    mov eax, 1                 ; SYS_WRITE
+    mov ebx, edi
     int 0x80
+    mov ecx, SPIN_ITERATIONS   ; burn CPU so the timer preempts us
+.spin:
+    dec ecx
+    jnz .spin
+    dec esi
+    jnz .loop
     mov eax, 0                 ; SYS_EXIT
     int 0x80
-%%hang:
-    jmp %%hang                 ; unreachable
-%2:
-%endmacro
-
-USER_PROG user_prog_a, msg_a
-    db 'process A says hello from ring 3 at 0x08048000!', 0x0A, 0
+.hang:
+    jmp .hang                  ; unreachable
+msg_a:
+    db 'tick from process A', 0x0A, 0
 user_prog_a_end:
 
-USER_PROG user_prog_b, msg_b
-    db 'process B says hello from the same address, different page tables!', 0x0A, 0
+global user_prog_b_start
+global user_prog_b_end
+user_prog_b_start:
+    call .here
+.here:
+    pop edi
+    add edi, msg_b - .here
+    mov esi, 3
+.loop:
+    mov eax, 1                 ; SYS_WRITE
+    mov ebx, edi
+    int 0x80
+    mov ecx, SPIN_ITERATIONS
+.spin:
+    dec ecx
+    jnz .spin
+    dec esi
+    jnz .loop
+    mov eax, 0                 ; SYS_EXIT
+    int 0x80
+.hang:
+    jmp .hang
+msg_b:
+    db 'tick from process B', 0x0A, 0
 user_prog_b_end:

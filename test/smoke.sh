@@ -31,7 +31,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 # 'help', 'meminfo', and 'sleep 50', then presses Up three times (history
 # recall back to 'help') and Enter to re-run it.
 {
-    sleep 5
+    sleep 8
     for key in h e l p ret \
                m e m i n f o ret \
                s l e e p spc 5 0 ret \
@@ -111,19 +111,29 @@ else
     fail=1
 fi
 
-# Two user programs, each in its own address space but mapped at the same
-# virtual address, print through the write syscall and exit.
-if grep -q "process A says hello" "$SERIAL_LOG" \
-        && grep -q "process B says hello" "$SERIAL_LOG"; then
-    echo "PASS: two isolated user processes ran and exited"
+# Two preemptively scheduled user processes each print three times.
+a_count=$(grep -c "tick from process A" "$SERIAL_LOG")
+b_count=$(grep -c "tick from process B" "$SERIAL_LOG")
+if [ "$a_count" -ge 3 ] && [ "$b_count" -ge 3 ]; then
+    echo "PASS: both user processes completed (A=${a_count}, B=${b_count})"
 else
-    echo "FAIL: user processes did not both run" >&2
+    echo "FAIL: user processes incomplete (A=${a_count}, B=${b_count})" >&2
+    fail=1
+fi
+
+# The CPU-bound spins span many 10 ms slices, so genuine preemption yields
+# well over the minimum 3 switches of a purely sequential run.
+switches=$(sed -n 's/.*\[sched\] \([0-9][0-9]*\) context switches.*/\1/p' "$SERIAL_LOG" | head -n 1)
+if [ -n "$switches" ] && [ "$switches" -ge 5 ]; then
+    echo "PASS: preemptive scheduling (${switches} context switches)"
+else
+    echo "FAIL: too few context switches ('${switches:-none}')" >&2
     fail=1
 fi
 
 # Printed only when teardown returned every frame the processes took.
 if grep -q "reclaimed cleanly" "$SERIAL_LOG"; then
-    echo "PASS: process address-space teardown leaked no frames"
+    echo "PASS: process teardown leaked no frames"
 else
     echo "FAIL: process teardown leaked frames" >&2
     fail=1
