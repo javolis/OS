@@ -14,6 +14,7 @@
 
 #define SC_LSHIFT 0x2A
 #define SC_RSHIFT 0x36
+#define SC_CTRL 0x1D /* right ctrl is the same code behind an 0xE0 prefix */
 #define SC_RELEASE 0x80
 
 /* Scancode set 1 make codes for a US QWERTY layout. 0 = no printable char. */
@@ -50,6 +51,7 @@ static const char keymap_shift[128] = {
 };
 
 static int shift_held;
+static int ctrl_held;
 static int e0_prefix; /* last byte was 0xE0 (extended-key prefix) */
 
 /* Ring buffer filled by the IRQ handler and drained by keyboard_getchar().
@@ -82,6 +84,8 @@ static void keyboard_irq(struct registers *regs) {
         uint8_t code = scancode & ~SC_RELEASE;
         if (!e0_prefix && (code == SC_LSHIFT || code == SC_RSHIFT))
             shift_held = 0;
+        if (code == SC_CTRL) /* left, or right behind the prefix */
+            ctrl_held = 0;
         e0_prefix = 0;
         return;
     }
@@ -92,17 +96,29 @@ static void keyboard_irq(struct registers *regs) {
             push(KEY_UP);
         else if (scancode == 0x50)
             push(KEY_DOWN);
-        return; /* other extended keys (right ctrl, etc.) still ignored */
+        else if (scancode == SC_CTRL)
+            ctrl_held = 1; /* right ctrl */
+        return; /* other extended keys still ignored */
     }
 
     if (scancode == SC_LSHIFT || scancode == SC_RSHIFT) {
         shift_held = 1;
         return;
     }
+    if (scancode == SC_CTRL) {
+        ctrl_held = 1;
+        return;
+    }
 
     char c = shift_held ? keymap_shift[scancode] : keymap[scancode];
-    if (c)
-        push(c);
+    if (!c)
+        return;
+
+    if (ctrl_held && (c == 'c' || c == 'C')) {
+        sched_interrupt_foreground(); /* Ctrl+C: never reaches the buffer */
+        return;
+    }
+    push(c);
 }
 
 int keyboard_trygetchar(void) {
