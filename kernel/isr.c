@@ -6,6 +6,7 @@
 #include "idt.h"
 #include "io.h"
 #include "kprintf.h"
+#include "syscall.h"
 
 static const char *const exception_names[32] = {
     "Divide Error",
@@ -45,6 +46,11 @@ static const char *const exception_names[32] = {
 void isr_handler(struct registers *regs);
 
 void isr_handler(struct registers *regs) {
+    if (regs->int_no == SYSCALL_VECTOR) {
+        syscall_handle(regs);
+        return;
+    }
+
     /* Breakpoints are non-fatal: report and resume after the int3. */
     if (regs->int_no == 3) {
         kprintf("breakpoint at eip=%08lx\n", regs->eip);

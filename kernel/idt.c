@@ -38,6 +38,9 @@ extern void irq0(void), irq1(void), irq2(void), irq3(void), irq4(void),
     irq5(void), irq6(void), irq7(void), irq8(void), irq9(void), irq10(void),
     irq11(void), irq12(void), irq13(void), irq14(void), irq15(void);
 
+/* Syscall stub (vector 0x80), also in boot/isr.s. */
+extern void isr128(void);
+
 static void idt_set_gate(uint8_t num, void (*handler)(void), uint16_t selector,
                          uint8_t flags) {
     uint32_t base = (uint32_t)handler;
@@ -70,6 +73,9 @@ void idt_init(void) {
         idt_set_gate(i, exception_stubs[i], GDT_KERNEL_CODE, IDT_GATE_FLAGS);
     for (int i = 0; i < 16; i++)
         idt_set_gate(32 + i, irq_stubs[i], GDT_KERNEL_CODE, IDT_GATE_FLAGS);
+
+    /* Syscall gate: DPL 3 so int 0x80 is allowed from user mode. */
+    idt_set_gate(0x80, isr128, GDT_KERNEL_CODE, 0xEE);
 
     __asm__ volatile("lidt %0" : : "m"(ip));
 }

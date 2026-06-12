@@ -53,6 +53,7 @@ ISR_NOERR 28                   ; hypervisor injection exception
 ISR_ERR   29                   ; VMM communication exception
 ISR_ERR   30                   ; security exception
 ISR_NOERR 31                   ; reserved
+ISR_NOERR 128                  ; int 0x80: syscall (gate has DPL 3)
 
 ; Hardware IRQ stubs (vectors 32-47, after the 8259 PIC remap). IRQs never
 ; push an error code, so always push a dummy 0 to match struct registers.

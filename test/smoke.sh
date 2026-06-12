@@ -111,6 +111,16 @@ else
     fail=1
 fi
 
+# Printed by the embedded ring-3 program through the write syscall, then
+# the kernel confirms the exit syscall brought it back.
+if grep -q "Hello from ring 3" "$SERIAL_LOG" \
+        && grep -q "Back in ring 0" "$SERIAL_LOG"; then
+    echo "PASS: ring-3 round trip (user program + syscalls)"
+else
+    echo "FAIL: ring-3 round trip did not complete" >&2
+    fail=1
+fi
+
 # Up-arrow history recall re-runs 'help', so its response must appear twice.
 help_count=$(grep -c "commands: help" "$SERIAL_LOG")
 if [ "$help_count" -ge 2 ]; then

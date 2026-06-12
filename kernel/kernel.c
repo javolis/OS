@@ -16,6 +16,7 @@
 #include "shell.h"
 #include "term.h"
 #include "timer.h"
+#include "usermode.h"
 
 #if defined(__linux__)
 #error "This kernel must be built with a cross-compiler, not the host toolchain."
@@ -90,6 +91,35 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     while (timer_ticks() < 10)
         __asm__ volatile("hlt");
     kprintf("PIT timer running at 100 Hz (%lu ticks).\n", timer_ticks());
+
+    /* Ring-3 round trip: copy the embedded user program into a
+     * user-mapped page, give it a stack, and iret into it. It prints via
+     * the write syscall and returns here via the exit syscall. */
+    {
+        extern char user_program_start[], user_program_end[];
+        const uint32_t USER_CODE_VADDR = 0x08048000u;
+        const uint32_t USER_STACK_VADDR = 0x08070000u;
+
+        uint32_t code_frame = pmm_alloc_frame();
+        uint32_t stack_frame = pmm_alloc_frame();
+        uint32_t prog_size =
+            (uint32_t)(user_program_end - user_program_start);
+        if (!code_frame || !stack_frame || prog_size > 4096) {
+            kprintf("PANIC: cannot stage the user program\n");
+            halt_forever();
+        }
+        uint8_t *dst = phys_to_virt(code_frame);
+        for (uint32_t i = 0; i < prog_size; i++)
+            dst[i] = user_program_start[i];
+        paging_map_user(USER_CODE_VADDR, code_frame);
+        paging_map_user(USER_STACK_VADDR, stack_frame);
+
+        enter_user_mode(USER_CODE_VADDR, USER_STACK_VADDR + 4096 - 16);
+        /* The exit syscall abandoned its interrupt frame, so the gate's
+         * IF-clear is still in effect: re-enable interrupts. */
+        __asm__ volatile("sti");
+        kprintf("Back in ring 0.\n");
+    }
 
     /* Marker the headless smoke test greps for; keep in sync with test/smoke.sh. */
     serial_write("KERNEL_BOOT_OK\n");
