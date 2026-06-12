@@ -18,5 +18,13 @@ uint32_t sched_switch_count(void);
 /* Called by the timer IRQ on every tick (no-op while stopped). */
 void sched_tick(void);
 
+/* Block the calling task for at least nticks ticks (syscall context). */
+void sched_sleep_current(uint32_t nticks);
+
+uint32_t sched_current_pid(void);
+
+/* Print the task table via kprintf (the shell's ps command). */
+void sched_ps(void);
+
 /* Terminate the calling task (used by the exit syscall). */
 void task_exit(void) __attribute__((noreturn));
