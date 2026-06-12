@@ -36,13 +36,14 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                l s ret \
                m e m i n f o ret \
                s l e e p spc 5 0 ret \
-               up up up up ret; do
+               up up up up ret \
+               r u n spc h e l l o shift-minus a dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
     done
-    sleep 1
+    sleep 4
     echo "quit"
-} | timeout 60 qemu-system-i386 \
+} | timeout 90 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
@@ -139,6 +140,16 @@ if grep -q "^initrd: " "$SERIAL_LOG" \
     echo "PASS: initrd loaded and listed"
 else
     echo "FAIL: initrd missing or ls did not list it" >&2
+    fail=1
+fi
+
+# 'run hello_a.elf' typed at the shell spawns a fourth task while the
+# scheduler stays live: process A's message must appear 3 more times on
+# top of the boot demo's 3.
+if [ "$a_count" -ge 6 ]; then
+    echo "PASS: run command spawned a process from the shell (A=${a_count})"
+else
+    echo "FAIL: run command did not produce program output (A=${a_count})" >&2
     fail=1
 fi
 
