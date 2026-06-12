@@ -12,6 +12,9 @@ void paging_map(uint32_t virt, uint32_t phys);
 /* Map a ring-3-accessible page into a specific address space. */
 void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys);
 
+/* Physical frame backing `virt` in the given address space, 0 if unmapped. */
+uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt);
+
 /* Create a new address space sharing the kernel half (PDEs 768-1023) with
  * the kernel directory; the user half starts empty. Returns the directory's
  * physical address. */
