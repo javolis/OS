@@ -53,6 +53,14 @@ void isr_handler(struct registers *regs) {
 
     kprintf("\nKERNEL PANIC: exception %lu (%s), error code %08lx\n",
             regs->int_no, exception_names[regs->int_no & 31], regs->err_code);
+    if (regs->int_no == 14) { /* page fault: CR2 holds the faulting address */
+        uint32_t cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        kprintf("  page fault at %08lx (%s, %s, %s mode)\n", cr2,
+                (regs->err_code & 1) ? "protection violation" : "not present",
+                (regs->err_code & 2) ? "write" : "read",
+                (regs->err_code & 4) ? "user" : "kernel");
+    }
     kprintf("  eip=%08lx cs=%04lx eflags=%08lx\n", regs->eip, regs->cs,
             regs->eflags);
     kprintf("  eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx\n", regs->eax,

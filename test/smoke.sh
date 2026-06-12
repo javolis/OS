@@ -72,4 +72,13 @@ else
     fail=1
 fi
 
+# Printed after CR0.PG is set; the shell passing above also proves the
+# system stays alive (interrupts, VGA, serial) with paging on.
+if grep -q "Paging enabled" "$SERIAL_LOG"; then
+    echo "PASS: paging enabled"
+else
+    echo "FAIL: paging-enabled marker not found" >&2
+    fail=1
+fi
+
 exit $fail

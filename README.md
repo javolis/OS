@@ -13,7 +13,8 @@ via a small `kprintf`. Unhandled exceptions panic with a register dump
 instead of triple-faulting. The 8259 PIC is remapped and hardware IRQs are
 live: a 100 Hz PIT tick and a PS/2 keyboard feeding a tiny interactive
 shell (help / echo / clear / ticks / meminfo) with line editing. A bitmap
-physical frame allocator is seeded from the Multiboot memory map.
+physical frame allocator is seeded from the Multiboot memory map, and
+paging is enabled with all physical RAM identity-mapped.
 
 ## Prerequisites (Linux dev host)
 
