@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "initrd.h"
 #include "keyboard.h"
 #include "kheap.h"
 #include "kprintf.h"
@@ -162,7 +163,9 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history\n");
+                    "history ls\n");
+        else if (streq(cmd, "ls"))
+            initrd_list();
         else if (streq(cmd, "echo"))
             kprintf("%s\n", rest);
         else if (streq(cmd, "clear"))

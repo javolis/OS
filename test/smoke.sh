@@ -33,6 +33,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 {
     sleep 8
     for key in h e l p ret \
+               l s ret \
                m e m i n f o ret \
                s l e e p spc 5 0 ret \
                up up up ret; do
@@ -127,6 +128,17 @@ if grep -q "spawned (ELF entry" "$SERIAL_LOG"; then
     echo "PASS: ELF loader staged the executables"
 else
     echo "FAIL: ELF loader did not report a load" >&2
+    fail=1
+fi
+
+# The boot banner proves the Multiboot module arrived; the ls listing
+# proves the tar reader walks it.
+if grep -q "^initrd: " "$SERIAL_LOG" \
+        && grep -q "hello_a.elf" "$SERIAL_LOG" \
+        && grep -q "hello_b.elf" "$SERIAL_LOG"; then
+    echo "PASS: initrd loaded and listed"
+else
+    echo "FAIL: initrd missing or ls did not list it" >&2
     fail=1
 fi
 

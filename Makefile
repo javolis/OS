@@ -15,9 +15,10 @@ OBJ  := $(patsubst %.s,%.o,$(wildcard boot/*.s)) \
         $(patsubst %.c,%.o,$(wildcard kernel/*.c))
 HDRS := $(wildcard include/*.h)
 
-# Userland: standalone ELF executables, embedded into the kernel image by
-# boot/userblobs.s (no filesystem yet).
+# Userland: standalone ELF executables, shipped to the kernel in a USTAR
+# initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf
+INITRD    := initrd.tar
 
 .PHONY: all iso run test clean
 
@@ -38,11 +39,13 @@ user/%.o: user/%.c user/usys.h
 user/%.elf: user/%.o user/user.ld
 	$(LD) -ffreestanding -O2 -nostdlib -T user/user.ld -o $@ $< -lgcc
 
-boot/userblobs.o: $(USER_ELFS)
+$(INITRD): $(USER_ELFS)
+	tar --format=ustar -cf $@ -C user $(notdir $(USER_ELFS))
 
-iso: $(KERNEL)
+iso: $(KERNEL) $(INITRD)
 	mkdir -p isodir/boot/grub
 	cp $(KERNEL) isodir/boot/kernel.elf
+	cp $(INITRD) isodir/boot/initrd.tar
 	cp grub.cfg isodir/boot/grub/grub.cfg
 	grub-mkrescue -o $(ISO) isodir
 
@@ -53,4 +56,4 @@ test: iso
 	bash test/smoke.sh $(ISO)
 
 clean:
-	rm -rf $(OBJ) $(KERNEL) $(ISO) isodir user/*.o user/*.elf
+	rm -rf $(OBJ) $(KERNEL) $(ISO) $(INITRD) isodir user/*.o user/*.elf

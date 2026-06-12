@@ -19,10 +19,10 @@ seeded from the Multiboot memory map, all physical RAM is offset-mapped in
 the higher half (the identity mapping is dropped after boot, so NULL
 dereferences fault), and a kernel heap (kmalloc / kfree) grows on demand
 into its own virtual region. Preemptive multitasking works: at boot the
-kernel loads two real ELF executables (compiled separately from C in
-user/, embedded in the image — no filesystem yet), each into its own
-address space (own page directory, kernel half shared, both linked at
-0x08048000), and the PIT round-robins between them — each task has its
+kernel loads two real ELF executables from a USTAR initrd (compiled
+separately from C in user/, shipped as a GRUB Multiboot module), each
+into its own address space (own page directory, kernel half shared, both
+linked at 0x08048000), and the PIT round-robins between them — each task has its
 own kernel stack, the TSS esp0 follows the running task, and the boot
 flow doubles as the idle task. User code talks to the kernel via int
 0x80 (write / exit syscalls); teardown reclaims every frame.

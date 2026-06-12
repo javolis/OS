@@ -9,6 +9,7 @@
 
 /* multiboot_info.flags bits. */
 #define MULTIBOOT_INFO_MEMORY 0x01  /* mem_lower / mem_upper valid */
+#define MULTIBOOT_INFO_MODS 0x08    /* mods_count / mods_addr valid */
 #define MULTIBOOT_INFO_MEM_MAP 0x40 /* mmap_length / mmap_addr valid */
 
 struct multiboot_info {
@@ -23,6 +24,14 @@ struct multiboot_info {
     uint32_t mmap_length; /* total size of the memory map buffer */
     uint32_t mmap_addr;   /* physical address of the first entry */
     /* further fields exist but are not needed yet */
+};
+
+/* One entry of the boot-module list (mods_addr points at an array). */
+struct multiboot_mod {
+    uint32_t mod_start; /* physical */
+    uint32_t mod_end;
+    uint32_t cmdline;
+    uint32_t pad;
 };
 
 #define MULTIBOOT_MEMORY_AVAILABLE 1
