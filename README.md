@@ -27,9 +27,10 @@ own kernel stack, the TSS esp0 follows the running task, and the boot
 flow doubles as the idle task. The scheduler stays on after boot: the
 shell is the idle task and its `run <file>` command spawns initrd
 programs live (zombies are reaped at the prompt; kprintf is
-interrupt-atomic so output lines never interleave). User code talks to
-the kernel via int 0x80 (write / exit syscalls); teardown reclaims every
-frame.
+interrupt-atomic so output lines never interleave; ps shows the task
+table). User code talks to the kernel via int 0x80 (write / exit /
+sleep / getpid); sleep blocks properly — the scheduler runs other tasks,
+including the shell, until the wake tick. Teardown reclaims every frame.
 
 ## Prerequisites (Linux dev host)
 

@@ -169,7 +169,9 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls run\n");
+                    "history ls run ps\n");
+        else if (streq(cmd, "ps"))
+            sched_ps();
         else if (streq(cmd, "ls"))
             initrd_list();
         else if (streq(cmd, "run")) {

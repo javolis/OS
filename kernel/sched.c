@@ -18,12 +18,13 @@
 #include "kprintf.h"
 #include "paging.h"
 #include "sched.h"
+#include "timer.h"
 #include "usermode.h"
 
 #define MAX_TASKS 8
 #define KSTACK_SIZE 8192u
 
-enum task_state { TASK_FREE = 0, TASK_READY, TASK_ZOMBIE };
+enum task_state { TASK_FREE = 0, TASK_READY, TASK_BLOCKED, TASK_ZOMBIE };
 
 struct task {
     volatile enum task_state state;
@@ -34,6 +35,7 @@ struct task {
     uint32_t kesp;
     uint32_t user_eip;
     uint32_t user_esp;
+    uint32_t wake_at; /* tick at which a BLOCKED task becomes READY */
 };
 
 static struct task tasks[MAX_TASKS]; /* slot 0 = boot/idle task */
@@ -129,8 +131,44 @@ static void schedule(void) {
 }
 
 void sched_tick(void) {
-    if (preempt_on)
-        schedule();
+    if (!preempt_on)
+        return;
+
+    /* Wake sleepers whose deadline passed (wraparound-safe comparison). */
+    uint32_t now = timer_ticks();
+    for (int i = 1; i < MAX_TASKS; i++)
+        if (tasks[i].state == TASK_BLOCKED &&
+            (int32_t)(now - tasks[i].wake_at) >= 0)
+            tasks[i].state = TASK_READY;
+
+    schedule();
+}
+
+/* Block the calling task for at least nticks timer ticks. Must be called
+ * with interrupts off (syscall context); returns once the sleep elapsed
+ * and the scheduler picked the task again. */
+void sched_sleep_current(uint32_t nticks) {
+    current->wake_at = timer_ticks() + nticks;
+    current->state = TASK_BLOCKED;
+    schedule();
+}
+
+uint32_t sched_current_pid(void) {
+    return current->pid;
+}
+
+void sched_ps(void) {
+    static const char *const names[] = {"free", "ready", "blocked",
+                                        "zombie"};
+    kprintf("  PID  STATE\n");
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (i != 0 && tasks[i].state == TASK_FREE)
+            continue;
+        const char *st =
+            (&tasks[i] == current) ? "running" : names[tasks[i].state];
+        kprintf("%5lu  %s%s\n", tasks[i].pid, st,
+                i == 0 ? " (shell/idle)" : "");
+    }
 }
 
 void sched_start(void) {
@@ -144,7 +182,7 @@ void sched_stop(void) {
 
 int sched_user_tasks_alive(void) {
     for (int i = 1; i < MAX_TASKS; i++)
-        if (tasks[i].state == TASK_READY)
+        if (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED)
             return 1;
     return 0;
 }

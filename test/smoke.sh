@@ -37,7 +37,9 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                m e m i n f o ret \
                s l e e p spc 5 0 ret \
                up up up up ret \
-               r u n spc h e l l o shift-minus a dot e l f ret; do
+               r u n spc h e l l o shift-minus a dot e l f ret \
+               r u n spc c l o c k dot e l f ret \
+               p s ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -150,6 +152,27 @@ if [ "$a_count" -ge 6 ]; then
     echo "PASS: run command spawned a process from the shell (A=${a_count})"
 else
     echo "FAIL: run command did not produce program output (A=${a_count})" >&2
+    fail=1
+fi
+
+# The clock program does five 300 ms blocking sleeps.
+clock_count=$(grep -c "clock: tick" "$SERIAL_LOG")
+if [ "$clock_count" -ge 5 ] && grep -q "clock: done" "$SERIAL_LOG"; then
+    echo "PASS: clock completed ${clock_count} blocking sleeps"
+else
+    echo "FAIL: clock program incomplete (${clock_count} ticks)" >&2
+    fail=1
+fi
+
+# Blocking proof: ps was typed while the clock still had sleeps left, so
+# its output must appear BEFORE the clock finishes. A busy-wait sleep
+# would starve the shell and push ps output after 'clock: done'.
+ps_line=$(grep -n "PID  STATE" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+done_line=$(grep -n "clock: done" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+if [ -n "$ps_line" ] && [ -n "$done_line" ] && [ "$ps_line" -lt "$done_line" ]; then
+    echo "PASS: shell responsive while clock sleeps (ps at line ${ps_line}, done at ${done_line})"
+else
+    echo "FAIL: ps output did not appear while clock was sleeping" >&2
     fail=1
 fi
 
