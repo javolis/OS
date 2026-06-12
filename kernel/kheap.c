@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "io.h"
 #include "kheap.h"
 #include "kprintf.h"
 #include "memlayout.h"
@@ -86,6 +87,10 @@ void *kmalloc(uint32_t size) {
         return NULL;
     size = (size + 3u) & ~3u; /* keep payloads 4-byte aligned */
 
+    /* Callable from preemptible kernel context (the shell) and from
+     * syscall context (any task spawning) — guard the free list. */
+    uint32_t flags = irq_save();
+
     for (;;) {
         for (struct block *b = head; b; b = b->next) {
             if (!b->free || b->size < size)
@@ -100,16 +105,20 @@ void *kmalloc(uint32_t size) {
                 b->next = nb;
             }
             b->free = 0;
+            irq_restore(flags);
             return (uint8_t *)b + HDR_SIZE;
         }
-        if (!grow(size + HDR_SIZE))
+        if (!grow(size + HDR_SIZE)) {
+            irq_restore(flags);
             return NULL;
+        }
     }
 }
 
 void kfree(void *ptr) {
     if (!ptr)
         return;
+    uint32_t flags = irq_save();
     struct block *b = (struct block *)((uint8_t *)ptr - HDR_SIZE);
     b->free = 1;
 
@@ -121,13 +130,16 @@ void kfree(void *ptr) {
             cur->next = cur->next->next;
         }
     }
+    irq_restore(flags);
 }
 
 void kheap_stats(uint32_t *used_out, uint32_t *total_out) {
+    uint32_t flags = irq_save();
     uint32_t used = 0;
     for (struct block *b = head; b; b = b->next)
         if (!b->free)
             used += b->size;
     *used_out = used;
     *total_out = heap_end - KHEAP_START;
+    irq_restore(flags);
 }

@@ -46,7 +46,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c l o c k dot e l f spc shift-7 ret \
                k i l l spc 7 ret \
                r u n spc g r e e t dot e l f ret \
-               c i ret; do
+               c i ret \
+               r u n spc r u n n e r dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -231,6 +232,17 @@ if grep -q "What is your name" "$SERIAL_LOG" \
     echo "PASS: user program read keyboard input via sys_readline"
 else
     echo "FAIL: greet did not read keyboard input" >&2
+    fail=1
+fi
+
+# Spawn/wait: runner spawns echo.elf and waits for it, so its completion
+# line must come after the child's output.
+child_line=$(grep -n "from runner child" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+fin_line=$(grep -n "runner: child finished" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+if [ -n "$child_line" ] && [ -n "$fin_line" ] && [ "$child_line" -lt "$fin_line" ]; then
+    echo "PASS: sys_spawn + sys_wait (child before parent continuation)"
+else
+    echo "FAIL: spawn/wait ordering broken" >&2
     fail=1
 fi
 

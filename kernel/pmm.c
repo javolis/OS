@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "io.h"
 #include "memlayout.h"
 #include "multiboot.h"
 #include "pmm.h"
@@ -131,21 +132,29 @@ void pmm_init(const struct multiboot_info *mbi) {
 }
 
 uint32_t pmm_alloc_frame(void) {
-    if (free_count == 0)
-        return 0;
-    for (uint32_t i = 0; i < total_frames; i++) {
-        uint32_t frame = (next_hint + i) % total_frames;
-        if (!frame_used(frame)) {
-            mark_used(frame);
-            next_hint = frame + 1;
-            return frame * FRAME_SIZE;
+    /* Callable from preemptible kernel context and syscall context alike —
+     * guard the bitmap and cursor. */
+    uint32_t flags = irq_save();
+    uint32_t result = 0;
+    if (free_count > 0) {
+        for (uint32_t i = 0; i < total_frames; i++) {
+            uint32_t frame = (next_hint + i) % total_frames;
+            if (!frame_used(frame)) {
+                mark_used(frame);
+                next_hint = frame + 1;
+                result = frame * FRAME_SIZE;
+                break;
+            }
         }
     }
-    return 0; /* unreachable while free_count is accurate */
+    irq_restore(flags);
+    return result;
 }
 
 void pmm_free_frame(uint32_t addr) {
+    uint32_t flags = irq_save();
     mark_free(addr / FRAME_SIZE);
+    irq_restore(flags);
 }
 
 uint32_t pmm_total_frames(void) {

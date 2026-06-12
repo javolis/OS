@@ -36,3 +36,24 @@ static inline int sys_readline(char *buf, int size) {
                      : "memory");
     return ret;
 }
+
+/* Launch an initrd program ("file.elf arg1 arg2..."). Returns its pid. */
+static inline int sys_spawn(const char *cmdline) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(5), "b"(cmdline), "c"(0));
+    return ret;
+}
+
+/* Same, but the child inherits the keyboard (caller must be foreground). */
+static inline int sys_spawn_fg(const char *cmdline) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(5), "b"(cmdline), "c"(1));
+    return ret;
+}
+
+/* Block until the given pid exits. */
+static inline int sys_wait(int pid) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(6), "b"(pid));
+    return ret;
+}
