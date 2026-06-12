@@ -6,6 +6,7 @@
 #include "idt.h"
 #include "io.h"
 #include "kprintf.h"
+#include "sched.h"
 #include "syscall.h"
 
 static const char *const exception_names[32] = {
@@ -57,16 +58,32 @@ void isr_handler(struct registers *regs) {
         return;
     }
 
+    uint32_t cr2 = 0;
+    if (regs->int_no == 14) /* page fault: CR2 holds the faulting address */
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+
+    /* A fault raised in ring 3 is the task's problem, not the kernel's:
+     * report it, kill the task, and keep the system running. */
+    if ((regs->cs & 3) == 3) {
+        kprintf("[pid %lu] killed: %s at eip=%08lx", sched_current_pid(),
+                exception_names[regs->int_no & 31], regs->eip);
+        if (regs->int_no == 14)
+            kprintf(" (%s %s at %08lx)",
+                    (regs->err_code & 2) ? "write" : "read",
+                    (regs->err_code & 1) ? "protection violation"
+                                         : "to unmapped address",
+                    cr2);
+        kprintf("\n");
+        task_exit();
+    }
+
     kprintf("\nKERNEL PANIC: exception %lu (%s), error code %08lx\n",
             regs->int_no, exception_names[regs->int_no & 31], regs->err_code);
-    if (regs->int_no == 14) { /* page fault: CR2 holds the faulting address */
-        uint32_t cr2;
-        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+    if (regs->int_no == 14)
         kprintf("  page fault at %08lx (%s, %s, %s mode)\n", cr2,
                 (regs->err_code & 1) ? "protection violation" : "not present",
                 (regs->err_code & 2) ? "write" : "read",
                 (regs->err_code & 4) ? "user" : "kernel");
-    }
     kprintf("  eip=%08lx cs=%04lx eflags=%08lx\n", regs->eip, regs->cs,
             regs->eflags);
     kprintf("  eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx\n", regs->eax,

@@ -39,7 +39,9 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                up up up up ret \
                r u n spc h e l l o shift-minus a dot e l f ret \
                r u n spc c l o c k dot e l f ret \
-               p s ret; do
+               p s ret \
+               r u n spc c r a s h dot e l f ret \
+               e c h o spc s u r v i v e d ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -173,6 +175,27 @@ if [ -n "$ps_line" ] && [ -n "$done_line" ] && [ "$ps_line" -lt "$done_line" ]; 
     echo "PASS: shell responsive while clock sleeps (ps at line ${ps_line}, done at ${done_line})"
 else
     echo "FAIL: ps output did not appear while clock was sleeping" >&2
+    fail=1
+fi
+
+# Fault isolation: crash.elf writes to NULL. The kernel must kill just
+# that task (never reaching the program's next line) and the shell must
+# still work afterwards ('echo survived' typed after the crash).
+if grep -q "crash: writing to NULL" "$SERIAL_LOG" \
+        && grep -q "killed:" "$SERIAL_LOG" \
+        && ! grep -q "still alive" "$SERIAL_LOG"; then
+    echo "PASS: faulting user task was killed, not the kernel"
+else
+    echo "FAIL: user fault was not isolated" >&2
+    fail=1
+fi
+
+kill_line=$(grep -n "killed:" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+survived_line=$(grep -n "^survived" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+if [ -n "$kill_line" ] && [ -n "$survived_line" ] && [ "$kill_line" -lt "$survived_line" ]; then
+    echo "PASS: shell survived the user crash"
+else
+    echo "FAIL: shell did not respond after the crash" >&2
     fail=1
 fi
 

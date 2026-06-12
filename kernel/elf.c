@@ -20,6 +20,8 @@ static int load_segment(uint32_t dir_phys, const uint8_t *image,
     uint32_t file_end = seg_start + ph->p_filesz;
     uint32_t mem_end = seg_start + ph->p_memsz;
 
+    int writable = (ph->p_flags & PF_W) != 0;
+
     for (uint32_t page = seg_start & ~(PAGE_SIZE - 1); page < mem_end;
          page += PAGE_SIZE) {
         /* Segments may share a page (e.g. rodata then data); reuse the
@@ -32,7 +34,11 @@ static int load_segment(uint32_t dir_phys, const uint8_t *image,
             uint8_t *f = phys_to_virt(frame);
             for (uint32_t i = 0; i < PAGE_SIZE; i++)
                 f[i] = 0; /* covers BSS and any gap bytes */
-            paging_map_user_in(dir_phys, page, frame);
+            paging_map_user_in(dir_phys, page, frame, writable);
+        } else if (writable) {
+            /* Shared page where this segment needs write access: upgrade
+             * (never downgrade — an earlier writable segment wins). */
+            paging_map_user_in(dir_phys, page, frame, 1);
         }
 
         /* Copy the part of [page, page+4K) that overlaps the file data. */

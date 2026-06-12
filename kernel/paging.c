@@ -99,8 +99,18 @@ void paging_map(uint32_t virt, uint32_t phys) {
     map_page_in(page_directory_phys, virt, phys, PAGE_PRESENT | PAGE_WRITE);
 }
 
-void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys) {
-    map_page_in(dir_phys, virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys,
+                        int writable) {
+    uint32_t flags = PAGE_PRESENT | PAGE_USER;
+    if (writable)
+        flags |= PAGE_WRITE;
+    map_page_in(dir_phys, virt, phys, flags);
+}
+
+uint32_t paging_active_directory(void) {
+    uint32_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    return cr3;
 }
 
 uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt) {
