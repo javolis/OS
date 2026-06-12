@@ -24,6 +24,9 @@ void sched_sleep_current(uint32_t nticks);
 /* Block the calling task until keyboard input arrives (syscall context). */
 void sched_block_on_keyboard(void);
 
+/* Block the calling task until `pid` exits (syscall context). */
+void sched_wait_pid(uint32_t pid);
+
 /* Wake keyboard-blocked tasks (keyboard IRQ context). */
 void sched_wake_keyboard(void);
 

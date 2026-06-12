@@ -13,5 +13,9 @@
 #define SYS_READLINE 4 /* ebx = buffer, ecx = size; foreground task only;
                         * blocks for a line of keyboard input, returns its
                         * length (or -1) */
+#define SYS_SPAWN 5    /* ebx = cmdline string (file name + args); ecx = 1
+                        * to pass the foreground on (caller must own it);
+                        * returns child pid or -1 */
+#define SYS_WAIT 6     /* ebx = pid; blocks until it exits */
 
 void syscall_handle(struct registers *regs);

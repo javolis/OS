@@ -1,16 +1,19 @@
 /* syscall.c — int 0x80 system call dispatch. */
 #include <stdint.h>
 
+#include "initrd.h"
 #include "keyboard.h"
 #include "kprintf.h"
 #include "memlayout.h"
 #include "paging.h"
+#include "process.h"
 #include "sched.h"
 #include "serial.h"
 #include "syscall.h"
 #include "term.h"
 
 #define SYS_WRITE_MAX 1024
+#define SPAWN_CMDLINE_MAX 128
 
 /* Validate a user string: every byte up to the NUL must lie below the
  * kernel base on a mapped page of the calling task's address space
@@ -125,6 +128,49 @@ void syscall_handle(struct registers *regs) {
         regs->eax = do_readline((char *)regs->ebx, regs->ecx);
         return;
     }
+
+    case SYS_SPAWN: {
+        if (!user_string_ok(regs->ebx)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        /* Copy to a kernel buffer; the string lives in the caller's
+         * address space and process_spawn re-reads it repeatedly. */
+        char cmdline[SPAWN_CMDLINE_MAX];
+        const char *src = (const char *)regs->ebx;
+        uint32_t n = 0;
+        while (src[n] && n + 1 < sizeof(cmdline)) {
+            cmdline[n] = src[n];
+            n++;
+        }
+        cmdline[n] = '\0';
+
+        char fname[32];
+        n = 0;
+        while (cmdline[n] && cmdline[n] != ' ' && n + 1 < sizeof(fname)) {
+            fname[n] = cmdline[n];
+            n++;
+        }
+        fname[n] = '\0';
+
+        uint32_t size;
+        const char *img = initrd_find(fname, &size);
+        if (!img) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int pid = process_spawn(img, img + size, cmdline);
+        if (pid > 0 && regs->ecx == 1 &&
+            sched_current_pid() == sched_foreground_pid())
+            sched_set_foreground((uint32_t)pid);
+        regs->eax = (uint32_t)pid;
+        return;
+    }
+
+    case SYS_WAIT:
+        sched_wait_pid(regs->ebx);
+        regs->eax = 0;
+        return;
 
     default:
         regs->eax = (uint32_t)-1;
