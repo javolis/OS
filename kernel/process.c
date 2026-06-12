@@ -31,7 +31,7 @@ int process_spawn(const char *image_start, const char *image_end) {
         paging_destroy_address_space(dir);
         return -1;
     }
-    paging_map_user_in(dir, USER_STACK_VADDR, stack_frame);
+    paging_map_user_in(dir, USER_STACK_VADDR, stack_frame, 1);
 
     int pid = sched_spawn_user(dir, entry,
                                USER_STACK_VADDR + FRAME_SIZE - 16);

@@ -9,11 +9,16 @@ void paging_init(void);
  * table if needed. */
 void paging_map(uint32_t virt, uint32_t phys);
 
-/* Map a ring-3-accessible page into a specific address space. */
-void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys);
+/* Map a ring-3-accessible page into a specific address space; pass
+ * writable=0 for read-only segments (text/rodata). */
+void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys,
+                        int writable);
 
 /* Physical frame backing `virt` in the given address space, 0 if unmapped. */
 uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt);
+
+/* Physical address of the currently loaded page directory (CR3). */
+uint32_t paging_active_directory(void);
 
 /* Create a new address space sharing the kernel half (PDEs 768-1023) with
  * the kernel directory; the user half starts empty. Returns the directory's

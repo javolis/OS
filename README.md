@@ -30,7 +30,11 @@ programs live (zombies are reaped at the prompt; kprintf is
 interrupt-atomic so output lines never interleave; ps shows the task
 table). User code talks to the kernel via int 0x80 (write / exit /
 sleep / getpid); sleep blocks properly — the scheduler runs other tasks,
-including the shell, until the wake tick. Teardown reclaims every frame.
+including the shell, until the wake tick. Faults are isolated: a ring-3
+exception kills only the offending task (text/rodata segments are mapped
+read-only per ELF flags, and syscalls validate user pointers), while
+ring-0 faults still panic with a register dump. Teardown reclaims every
+frame.
 
 ## Prerequisites (Linux dev host)
 

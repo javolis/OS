@@ -36,6 +36,11 @@ struct elf32_phdr {
 #define EM_386 3
 #define PT_LOAD 1
 
+/* p_flags bits */
+#define PF_X 0x1
+#define PF_W 0x2
+#define PF_R 0x4
+
 /* Load an ELF32 executable image into the given address space: allocates
  * frames, maps them user-accessible, copies PT_LOAD file contents, and
  * zeroes BSS. Returns 0 and sets *entry_out on success, -1 on a malformed
