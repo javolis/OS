@@ -28,15 +28,15 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 
 # Feed monitor commands on a delay so the kernel has booted before we type,
 # pacing the keys so press/release pairs don't overlap. The sequence runs
-# 'help', 'meminfo', and 'sleep 50', then presses Up three times (history
-# recall back to 'help') and Enter to re-run it.
+# 'help', 'ls', 'meminfo', and 'sleep 50', then presses Up four times
+# (history recall back to 'help') and Enter to re-run it.
 {
     sleep 8
     for key in h e l p ret \
                l s ret \
                m e m i n f o ret \
                s l e e p spc 5 0 ret \
-               up up up ret; do
+               up up up up ret; do
         echo "sendkey $key"
         sleep 0.3
     done
