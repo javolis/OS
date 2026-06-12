@@ -1,12 +1,15 @@
-/* paging.c — enable x86 paging with all physical RAM identity-mapped.
+/* paging.c — final page tables for the higher-half kernel.
  *
- * Identity mapping keeps every existing pointer (kernel image, VGA buffer,
- * PMM bitmap, frames handed out by pmm_alloc_frame) valid after CR0.PG is
- * set, while making all memory access go through real page tables — the
- * stepping stone to non-identity kernel mappings and user address spaces. */
+ * boot.s enters the higher half on a temporary 4 MiB-page directory that
+ * maps only the first 4 MiB of RAM (at 0 and at KERNEL_VIRT_BASE).
+ * paging_init builds the real directory with 4 KiB pages — physical frame P
+ * appears at KERNEL_VIRT_BASE + P — and drops the identity mapping, so from
+ * then on NULL dereferences page-fault and everything below the kernel base
+ * is free for future user address spaces. */
 #include <stdint.h>
 
 #include "kprintf.h"
+#include "memlayout.h"
 #include "paging.h"
 #include "pmm.h"
 
@@ -15,62 +18,65 @@
 #define ENTRIES 1024
 #define FRAME_SIZE 4096u
 
-static uint32_t *page_directory;
+/* The offset-mapped window ends where the heap region begins (0xE0000000),
+ * capping mappable RAM at 512 MiB — far above what QEMU gives us. */
+#define MAX_OFFSET_MAPPED_FRAMES ((0xE0000000u - KERNEL_VIRT_BASE) / FRAME_SIZE)
 
-/* Grab a frame for paging structures and zero it (entries default to
- * not-present). Frames are identity-addressable while paging is off. */
-static uint32_t *alloc_table(void) {
+static uint32_t page_directory_phys;
+
+/* Grab a frame for paging structures and zero it through the higher-half
+ * window. Returns the frame's physical address (what PDEs want). */
+static uint32_t alloc_table_phys(void) {
     uint32_t frame = pmm_alloc_frame();
     if (!frame) {
         kprintf("PANIC: out of physical frames while building page tables\n");
         for (;;)
             __asm__ volatile("cli; hlt");
     }
-    uint32_t *table = (uint32_t *)frame;
+    uint32_t *table = phys_to_virt(frame);
     for (int i = 0; i < ENTRIES; i++)
         table[i] = 0;
-    return table;
+    return frame;
 }
 
 void paging_init(void) {
-    page_directory = alloc_table();
+    /* While this rebuild runs, only the first 4 MiB are mapped (boot.s),
+     * so every frame touched here must lie below 4 MiB physical. pmm's
+     * next-fit cursor starts just past its bitmap (~1 MiB), and the few
+     * dozen tables needed stay well inside that window. */
+    page_directory_phys = alloc_table_phys();
+    uint32_t *dir = phys_to_virt(page_directory_phys);
 
-    /* Identity-map every physical frame, building page tables on demand
-     * (one table per 4 MiB of address space). */
     uint32_t frames = pmm_total_frames();
-    for (uint32_t f = 0; f < frames; f++) {
-        uint32_t addr = f * FRAME_SIZE;
-        uint32_t pd_idx = addr >> 22;
-        uint32_t pt_idx = (addr >> 12) & 0x3FF;
+    if (frames > MAX_OFFSET_MAPPED_FRAMES)
+        frames = MAX_OFFSET_MAPPED_FRAMES;
 
-        if (!(page_directory[pd_idx] & PAGE_PRESENT)) {
-            uint32_t *table = alloc_table();
-            page_directory[pd_idx] =
-                (uint32_t)table | PAGE_PRESENT | PAGE_WRITE;
-        }
-        uint32_t *table = (uint32_t *)(page_directory[pd_idx] & ~0xFFFu);
-        table[pt_idx] = addr | PAGE_PRESENT | PAGE_WRITE;
+    for (uint32_t f = 0; f < frames; f++) {
+        uint32_t phys = f * FRAME_SIZE;
+        uint32_t virt = KERNEL_VIRT_BASE + phys;
+        uint32_t pd_idx = virt >> 22;
+        uint32_t pt_idx = (virt >> 12) & 0x3FF;
+
+        if (!(dir[pd_idx] & PAGE_PRESENT))
+            dir[pd_idx] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
+        uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
+        table[pt_idx] = phys | PAGE_PRESENT | PAGE_WRITE;
     }
 
-    /* Load the directory and turn paging on. */
-    __asm__ volatile("mov %0, %%cr3" : : "r"(page_directory));
-    uint32_t cr0;
-    __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
-    cr0 |= 0x80000000u; /* CR0.PG */
-    __asm__ volatile("mov %0, %%cr0" : : "r"(cr0));
+    /* Switch to the new directory (full TLB flush): the boot-time identity
+     * mapping disappears here. CR4.PSE stays set but is unused — the new
+     * tables contain only 4 KiB pages. */
+    __asm__ volatile("mov %0, %%cr3" : : "r"(page_directory_phys));
 }
 
 void paging_map(uint32_t virt, uint32_t phys) {
+    uint32_t *dir = phys_to_virt(page_directory_phys);
     uint32_t pd_idx = virt >> 22;
     uint32_t pt_idx = (virt >> 12) & 0x3FF;
 
-    if (!(page_directory[pd_idx] & PAGE_PRESENT)) {
-        uint32_t *table = alloc_table();
-        page_directory[pd_idx] = (uint32_t)table | PAGE_PRESENT | PAGE_WRITE;
-    }
-    /* Page tables sit in identity-mapped RAM, so their physical address is
-     * also their virtual address. */
-    uint32_t *table = (uint32_t *)(page_directory[pd_idx] & ~0xFFFu);
+    if (!(dir[pd_idx] & PAGE_PRESENT))
+        dir[pd_idx] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
+    uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
     table[pt_idx] = (phys & ~0xFFFu) | PAGE_PRESENT | PAGE_WRITE;
     __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }

@@ -6,17 +6,20 @@ A hobby operating system / kernel, built from scratch.
 
 ## Status
 
-Early bootstrap. A minimal freestanding i686 kernel that boots via the
-Multiboot protocol (GRUB), installs its own GDT and IDT (with handlers for
-all 32 CPU exceptions), and prints to the VGA text buffer and COM1 serial
-via a small `kprintf`. Unhandled exceptions panic with a register dump
-instead of triple-faulting. The 8259 PIC is remapped and hardware IRQs are
-live: a 100 Hz PIT tick and a PS/2 keyboard feeding a tiny interactive
-shell (help / echo / clear / ticks / meminfo / sleep / uptime / history)
-with line editing and arrow-key history. A bitmap physical frame allocator
-is seeded from the Multiboot memory map, paging is enabled with all
-physical RAM identity-mapped, and a kernel heap (kmalloc / kfree) grows on
-demand into its own virtual region.
+Early bootstrap. A freestanding i686 higher-half kernel (linked at
+0xC0100000, loaded at 1 MiB) that boots via the Multiboot protocol (GRUB),
+installs its own GDT and IDT (with handlers for all 32 CPU exceptions),
+and prints to the VGA text buffer and COM1 serial via a small `kprintf`.
+Unhandled exceptions panic with a register dump instead of
+triple-faulting. The 8259 PIC is remapped and hardware IRQs are live: a
+100 Hz PIT tick and a PS/2 keyboard feeding a tiny interactive shell
+(help / echo / clear / ticks / meminfo / sleep / uptime / history) with
+line editing and arrow-key history. A bitmap physical frame allocator is
+seeded from the Multiboot memory map, all physical RAM is offset-mapped in
+the higher half (the identity mapping is dropped after boot, so NULL
+dereferences fault), and a kernel heap (kmalloc / kfree) grows on demand
+into its own virtual region. Everything below 0xC0000000 is reserved for
+future user address spaces.
 
 ## Prerequisites (Linux dev host)
 
