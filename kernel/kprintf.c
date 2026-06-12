@@ -56,6 +56,13 @@ void kvprintf(const char *fmt, va_list ap) {
             i++;
         }
 
+        /* 'l' length modifier (long == 32-bit on i686, so same handling). */
+        int is_long = 0;
+        if (fmt[i] == 'l') {
+            is_long = 1;
+            i++;
+        }
+
         switch (fmt[i]) {
         case 'c':
             putchar_both((char)va_arg(ap, int));
@@ -66,7 +73,7 @@ void kvprintf(const char *fmt, va_list ap) {
             break;
         }
         case 'd': {
-            int32_t v = va_arg(ap, int32_t);
+            long v = is_long ? va_arg(ap, long) : va_arg(ap, int);
             if (v < 0) {
                 putchar_both('-');
                 /* Negate as 64-bit so INT32_MIN doesn't overflow. */
@@ -77,10 +84,14 @@ void kvprintf(const char *fmt, va_list ap) {
             break;
         }
         case 'u':
-            print_uint(va_arg(ap, uint32_t), 10, width, pad);
+            print_uint(is_long ? (uint32_t)va_arg(ap, unsigned long)
+                               : va_arg(ap, unsigned int),
+                       10, width, pad);
             break;
         case 'x':
-            print_uint(va_arg(ap, uint32_t), 16, width, pad);
+            print_uint(is_long ? (uint32_t)va_arg(ap, unsigned long)
+                               : va_arg(ap, unsigned int),
+                       16, width, pad);
             break;
         case 'p':
             write_both("0x");

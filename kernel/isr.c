@@ -47,18 +47,18 @@ void isr_handler(struct registers *regs);
 void isr_handler(struct registers *regs) {
     /* Breakpoints are non-fatal: report and resume after the int3. */
     if (regs->int_no == 3) {
-        kprintf("breakpoint at eip=%08x\n", regs->eip);
+        kprintf("breakpoint at eip=%08lx\n", regs->eip);
         return;
     }
 
-    kprintf("\nKERNEL PANIC: exception %u (%s), error code %08x\n",
+    kprintf("\nKERNEL PANIC: exception %lu (%s), error code %08lx\n",
             regs->int_no, exception_names[regs->int_no & 31], regs->err_code);
-    kprintf("  eip=%08x cs=%04x eflags=%08x\n", regs->eip, regs->cs,
+    kprintf("  eip=%08lx cs=%04lx eflags=%08lx\n", regs->eip, regs->cs,
             regs->eflags);
-    kprintf("  eax=%08x ebx=%08x ecx=%08x edx=%08x\n", regs->eax, regs->ebx,
-            regs->ecx, regs->edx);
-    kprintf("  esi=%08x edi=%08x ebp=%08x ds=%04x\n", regs->esi, regs->edi,
-            regs->ebp, regs->ds);
+    kprintf("  eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx\n", regs->eax,
+            regs->ebx, regs->ecx, regs->edx);
+    kprintf("  esi=%08lx edi=%08lx ebp=%08lx ds=%04lx\n", regs->esi,
+            regs->edi, regs->ebp, regs->ds);
 
     /* Fail fast in CI; on real hardware the port write is ignored and we
      * fall through to a halt loop. */
