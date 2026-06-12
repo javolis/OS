@@ -15,3 +15,9 @@ static inline uint8_t inb(uint16_t port) {
     __asm__ volatile("inb %1, %0" : "=a"(ret) : "Nd"(port));
     return ret;
 }
+
+/* Ask QEMU's isa-debug-exit device to power off. Harmless on real hardware
+ * (the port write is simply ignored when the device is absent). */
+static inline void qemu_exit(uint8_t code) {
+    outl(0xF4, code);
+}

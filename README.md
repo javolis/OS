@@ -6,8 +6,11 @@ A hobby operating system / kernel, built from scratch.
 
 ## Status
 
-Early bootstrap. Currently a minimal freestanding i686 kernel that boots via
-the Multiboot protocol (GRUB) and prints to the VGA text buffer.
+Early bootstrap. A minimal freestanding i686 kernel that boots via the
+Multiboot protocol (GRUB), installs its own GDT and IDT (with handlers for
+all 32 CPU exceptions), and prints to the VGA text buffer and COM1 serial
+via a small `kprintf`. Unhandled exceptions panic with a register dump
+instead of triple-faulting.
 
 ## Prerequisites (Linux dev host)
 
