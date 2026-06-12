@@ -25,3 +25,14 @@ static inline int sys_getpid(void) {
     __asm__ volatile("int $0x80" : "=a"(ret) : "a"(3));
     return ret;
 }
+
+/* Read one edited line of keyboard input (foreground process only).
+ * Returns the length, or -1. */
+static inline int sys_readline(char *buf, int size) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(4), "b"(buf), "c"(size)
+                     : "memory");
+    return ret;
+}

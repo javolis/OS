@@ -113,7 +113,7 @@ uint32_t paging_active_directory(void) {
     return cr3;
 }
 
-uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt) {
+uint32_t paging_get_pte(uint32_t dir_phys, uint32_t virt) {
     uint32_t *dir = phys_to_virt(dir_phys);
     uint32_t pd_idx = virt >> 22;
     uint32_t pt_idx = (virt >> 12) & 0x3FF;
@@ -123,7 +123,11 @@ uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt) {
     uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
     if (!(table[pt_idx] & PAGE_PRESENT))
         return 0;
-    return table[pt_idx] & ~0xFFFu;
+    return table[pt_idx];
+}
+
+uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt) {
+    return paging_get_pte(dir_phys, virt) & ~0xFFFu;
 }
 
 uint32_t paging_new_address_space(void) {

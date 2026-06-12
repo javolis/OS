@@ -21,6 +21,18 @@ void sched_tick(void);
 /* Block the calling task for at least nticks ticks (syscall context). */
 void sched_sleep_current(uint32_t nticks);
 
+/* Block the calling task until keyboard input arrives (syscall context). */
+void sched_block_on_keyboard(void);
+
+/* Wake keyboard-blocked tasks (keyboard IRQ context). */
+void sched_wake_keyboard(void);
+
+/* The foreground task owns the keyboard; pid 0 = the kernel shell. */
+void sched_set_foreground(uint32_t pid);
+uint32_t sched_foreground_pid(void);
+
+int sched_pid_alive(uint32_t pid);
+
 uint32_t sched_current_pid(void);
 
 /* Print the task table via kprintf (the shell's ps command). */
