@@ -64,14 +64,23 @@ void paging_init(void) {
         table[pt_idx] = phys | PAGE_PRESENT | PAGE_WRITE;
     }
 
+    /* Preallocate the heap region's page table now, so the kernel half of
+     * the directory never changes afterward — a process address space can
+     * then share it by copying PDEs once at creation time. */
+    {
+        uint32_t pd_idx = KHEAP_VIRT_BASE >> 22;
+        dir[pd_idx] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
+    }
+
     /* Switch to the new directory (full TLB flush): the boot-time identity
      * mapping disappears here. CR4.PSE stays set but is unused — the new
      * tables contain only 4 KiB pages. */
     __asm__ volatile("mov %0, %%cr3" : : "r"(page_directory_phys));
 }
 
-static void map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
-    uint32_t *dir = phys_to_virt(page_directory_phys);
+static void map_page_in(uint32_t dir_phys, uint32_t virt, uint32_t phys,
+                        uint32_t flags) {
+    uint32_t *dir = phys_to_virt(dir_phys);
     uint32_t pd_idx = virt >> 22;
     uint32_t pt_idx = (virt >> 12) & 0x3FF;
 
@@ -82,13 +91,51 @@ static void map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
         dir[pd_idx] |= PAGE_USER;
     uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
     table[pt_idx] = (phys & ~0xFFFu) | flags;
+    /* Flushes the active address space; harmless when dir_phys isn't it. */
     __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
 void paging_map(uint32_t virt, uint32_t phys) {
-    map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE);
+    map_page_in(page_directory_phys, virt, phys, PAGE_PRESENT | PAGE_WRITE);
 }
 
-void paging_map_user(uint32_t virt, uint32_t phys) {
-    map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys) {
+    map_page_in(dir_phys, virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+}
+
+uint32_t paging_new_address_space(void) {
+    uint32_t dir_phys = alloc_table_phys();
+    uint32_t *dir = phys_to_virt(dir_phys);
+    const uint32_t *kdir = phys_to_virt(page_directory_phys);
+
+    /* Share the kernel half: these PDEs point at the kernel's page tables,
+     * so later changes inside those tables (e.g. heap growth) are visible
+     * in every address space. */
+    for (int i = 768; i < ENTRIES; i++)
+        dir[i] = kdir[i];
+    return dir_phys;
+}
+
+void paging_destroy_address_space(uint32_t dir_phys) {
+    uint32_t *dir = phys_to_virt(dir_phys);
+
+    /* User half only — the kernel half is shared, not owned. */
+    for (int i = 0; i < 768; i++) {
+        if (!(dir[i] & PAGE_PRESENT))
+            continue;
+        uint32_t *table = phys_to_virt(dir[i] & ~0xFFFu);
+        for (int j = 0; j < ENTRIES; j++)
+            if (table[j] & PAGE_PRESENT)
+                pmm_free_frame(table[j] & ~0xFFFu);
+        pmm_free_frame(dir[i] & ~0xFFFu);
+    }
+    pmm_free_frame(dir_phys);
+}
+
+void paging_switch(uint32_t dir_phys) {
+    __asm__ volatile("mov %0, %%cr3" : : "r"(dir_phys));
+}
+
+uint32_t paging_kernel_directory(void) {
+    return page_directory_phys;
 }

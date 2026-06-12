@@ -11,12 +11,15 @@
 
 #include "kheap.h"
 #include "kprintf.h"
+#include "memlayout.h"
 #include "paging.h"
 #include "pmm.h"
 
-/* Above the 512 MiB offset-mapped RAM window that starts at 0xC0000000. */
-#define KHEAP_START 0xE0000000u
-#define KHEAP_MAX 0xE0400000u /* 4 MiB cap, easy to raise later */
+/* Region bounds live in memlayout.h: the heap may not outgrow its single
+ * page-directory slot, since that table is shared into every process
+ * address space at creation time. */
+#define KHEAP_START KHEAP_VIRT_BASE
+#define KHEAP_MAX KHEAP_VIRT_LIMIT
 #define PAGE_SIZE 4096u
 
 struct block {

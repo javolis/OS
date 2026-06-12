@@ -18,10 +18,12 @@ line editing and arrow-key history. A bitmap physical frame allocator is
 seeded from the Multiboot memory map, all physical RAM is offset-mapped in
 the higher half (the identity mapping is dropped after boot, so NULL
 dereferences fault), and a kernel heap (kmalloc / kfree) grows on demand
-into its own virtual region. Ring 3 works: at boot the kernel drops into
-an embedded user-mode program that prints through an int 0x80 write
-syscall and returns via exit (GDT user segments + TSS, DPL-3 syscall
-gate, user-bit page mappings).
+into its own virtual region. Ring 3 works with per-process address
+spaces: at boot the kernel runs two embedded user programs back to back,
+each in its own page directory (kernel half shared), both mapped at the
+same virtual address. They print through an int 0x80 write syscall and
+return via exit (GDT user segments + TSS, DPL-3 syscall gate, user-bit
+page mappings), and teardown reclaims every frame.
 
 ## Prerequisites (Linux dev host)
 
