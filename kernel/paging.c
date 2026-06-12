@@ -15,6 +15,7 @@
 
 #define PAGE_PRESENT 0x1u
 #define PAGE_WRITE 0x2u
+#define PAGE_USER 0x4u
 #define ENTRIES 1024
 #define FRAME_SIZE 4096u
 
@@ -69,14 +70,25 @@ void paging_init(void) {
     __asm__ volatile("mov %0, %%cr3" : : "r"(page_directory_phys));
 }
 
-void paging_map(uint32_t virt, uint32_t phys) {
+static void map_page(uint32_t virt, uint32_t phys, uint32_t flags) {
     uint32_t *dir = phys_to_virt(page_directory_phys);
     uint32_t pd_idx = virt >> 22;
     uint32_t pt_idx = (virt >> 12) & 0x3FF;
 
     if (!(dir[pd_idx] & PAGE_PRESENT))
         dir[pd_idx] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
+    /* User access requires the user bit at both levels. */
+    if (flags & PAGE_USER)
+        dir[pd_idx] |= PAGE_USER;
     uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
-    table[pt_idx] = (phys & ~0xFFFu) | PAGE_PRESENT | PAGE_WRITE;
+    table[pt_idx] = (phys & ~0xFFFu) | flags;
     __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+void paging_map(uint32_t virt, uint32_t phys) {
+    map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE);
+}
+
+void paging_map_user(uint32_t virt, uint32_t phys) {
+    map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
 }
