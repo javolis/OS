@@ -111,13 +111,22 @@ else
     fail=1
 fi
 
-# Two preemptively scheduled user processes each print three times.
-a_count=$(grep -c "tick from process A" "$SERIAL_LOG")
-b_count=$(grep -c "tick from process B" "$SERIAL_LOG")
+# Two preemptively scheduled user ELF executables each print three times.
+a_count=$(grep -c "ELF process A says hello" "$SERIAL_LOG")
+b_count=$(grep -c "ELF process B says hello" "$SERIAL_LOG")
 if [ "$a_count" -ge 3 ] && [ "$b_count" -ge 3 ]; then
-    echo "PASS: both user processes completed (A=${a_count}, B=${b_count})"
+    echo "PASS: both user ELF processes completed (A=${a_count}, B=${b_count})"
 else
-    echo "FAIL: user processes incomplete (A=${a_count}, B=${b_count})" >&2
+    echo "FAIL: user ELF processes incomplete (A=${a_count}, B=${b_count})" >&2
+    fail=1
+fi
+
+# Printed by process_spawn only after elf_load validated and mapped the
+# executable's PT_LOAD segments.
+if grep -q "spawned (ELF entry" "$SERIAL_LOG"; then
+    echo "PASS: ELF loader staged the executables"
+else
+    echo "FAIL: ELF loader did not report a load" >&2
     fail=1
 fi
 

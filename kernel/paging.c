@@ -103,6 +103,19 @@ void paging_map_user_in(uint32_t dir_phys, uint32_t virt, uint32_t phys) {
     map_page_in(dir_phys, virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
 }
 
+uint32_t paging_get_phys(uint32_t dir_phys, uint32_t virt) {
+    uint32_t *dir = phys_to_virt(dir_phys);
+    uint32_t pd_idx = virt >> 22;
+    uint32_t pt_idx = (virt >> 12) & 0x3FF;
+
+    if (!(dir[pd_idx] & PAGE_PRESENT))
+        return 0;
+    uint32_t *table = phys_to_virt(dir[pd_idx] & ~0xFFFu);
+    if (!(table[pt_idx] & PAGE_PRESENT))
+        return 0;
+    return table[pt_idx] & ~0xFFFu;
+}
+
 uint32_t paging_new_address_space(void) {
     uint32_t dir_phys = alloc_table_phys();
     uint32_t *dir = phys_to_virt(dir_phys);

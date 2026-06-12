@@ -15,6 +15,10 @@ OBJ  := $(patsubst %.s,%.o,$(wildcard boot/*.s)) \
         $(patsubst %.c,%.o,$(wildcard kernel/*.c))
 HDRS := $(wildcard include/*.h)
 
+# Userland: standalone ELF executables, embedded into the kernel image by
+# boot/userblobs.s (no filesystem yet).
+USER_ELFS := user/hello_a.elf user/hello_b.elf
+
 .PHONY: all iso run test clean
 
 all: $(KERNEL)
@@ -27,6 +31,14 @@ $(KERNEL): $(OBJ) linker.ld
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+user/%.o: user/%.c user/usys.h
+	$(CC) -std=gnu11 -ffreestanding -O2 -Wall -Wextra -c $< -o $@
+
+user/%.elf: user/%.o user/user.ld
+	$(LD) -ffreestanding -O2 -nostdlib -T user/user.ld -o $@ $< -lgcc
+
+boot/userblobs.o: $(USER_ELFS)
 
 iso: $(KERNEL)
 	mkdir -p isodir/boot/grub
@@ -41,4 +53,4 @@ test: iso
 	bash test/smoke.sh $(ISO)
 
 clean:
-	rm -rf $(OBJ) $(KERNEL) $(ISO) isodir
+	rm -rf $(OBJ) $(KERNEL) $(ISO) isodir user/*.o user/*.elf

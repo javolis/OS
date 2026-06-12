@@ -93,12 +93,12 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         __asm__ volatile("hlt");
     kprintf("PIT timer running at 100 Hz (%lu ticks).\n", timer_ticks());
 
-    /* Multitasking: spawn two CPU-bound user processes and let the PIT
-     * preempt between them while this boot flow acts as the idle task.
-     * Their output interleaves; teardown must return every frame. */
+    /* Multitasking: load two CPU-bound user ELF executables and let the
+     * PIT preempt between them while this boot flow acts as the idle
+     * task. Their output interleaves; teardown must return every frame. */
     {
-        extern char user_prog_a_start[], user_prog_a_end[];
-        extern char user_prog_b_start[], user_prog_b_end[];
+        extern char user_elf_a_start[], user_elf_a_end[];
+        extern char user_elf_b_start[], user_elf_b_end[];
 
         /* Warm the heap to working size first: growth pages stay with the
          * heap after kfree, which would otherwise read as a frame leak. */
@@ -109,8 +109,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
 
         uint32_t frames_before = pmm_free_frames();
         sched_init();
-        if (process_spawn(user_prog_a_start, user_prog_a_end) < 0 ||
-            process_spawn(user_prog_b_start, user_prog_b_end) < 0) {
+        if (process_spawn(user_elf_a_start, user_elf_a_end) < 0 ||
+            process_spawn(user_elf_b_start, user_elf_b_end) < 0) {
             kprintf("PANIC: could not spawn user processes\n");
             halt_forever();
         }
