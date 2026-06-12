@@ -43,9 +43,10 @@ void kernel_main(void) {
     serial_write("KERNEL_BOOT_OK\n");
     kprintf("Boot succeeded.\n");
 
-    /* Under the smoke test this exits QEMU. Without the isa-debug-exit
-     * device (make run, real hardware) it's a no-op and we idle below,
-     * echoing keystrokes via the keyboard IRQ. */
+    /* Exits QEMU only when the isa-debug-exit device is present. Neither
+     * the smoke test nor `make run` adds it (the smoke test types at the
+     * idle kernel via the QEMU monitor), so normally this is a no-op and
+     * we idle below, echoing keystrokes via the keyboard IRQ. */
     qemu_exit(0);
 
     kprintf("Type away; keys echo:\n");
