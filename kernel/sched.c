@@ -46,6 +46,7 @@ struct task {
     uint32_t wake_at;    /* tick at which a BLOCKED task becomes READY */
     uint32_t wait_pid;   /* pid a WAITPID task is waiting on */
     uint32_t parent_pid; /* spawner; foreground reverts here on exit */
+    char name[16];       /* argv[0], for ps */
 };
 
 static struct task tasks[MAX_TASKS]; /* slot 0 = boot/idle task */
@@ -55,13 +56,28 @@ static uint32_t switch_count;
 static uint32_t next_pid = 1;
 static volatile uint32_t fg_pid; /* keyboard owner; 0 = kernel shell */
 
+/* Earliest wake_at among BLOCKED tasks: lets sched_tick skip the sleeper
+ * scan entirely until a deadline is actually due. */
+static uint32_t next_wake;
+static int have_sleepers;
+
 /* boot/usermode.s */
 extern void switch_context(uint32_t *save_esp, uint32_t new_esp);
+
+static void copy_name(char *dst, const char *src) {
+    uint32_t n = 0;
+    while (src[n] && n < 15) {
+        dst[n] = src[n];
+        n++;
+    }
+    dst[n] = '\0';
+}
 
 void sched_init(void) {
     tasks[0].state = TASK_READY;
     tasks[0].pid = 0;
     tasks[0].pd_phys = paging_kernel_directory();
+    copy_name(tasks[0].name, "kshell");
     current = &tasks[0];
 }
 
@@ -73,7 +89,7 @@ static void task_entry(void) {
 }
 
 int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
-                     int make_foreground) {
+                     int make_foreground, const char *name) {
     /* Slot selection and pid assignment must not race with other spawners
      * (kernel shell with IF on vs. tasks inside the spawn syscall). */
     uint32_t flags = irq_save();
@@ -100,6 +116,7 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     t->user_eip = user_eip;
     t->user_esp = user_esp;
     t->parent_pid = current->pid;
+    copy_name(t->name, name);
     uint32_t pf = irq_save();
     t->pid = next_pid++;
     irq_restore(pf);
@@ -162,12 +179,25 @@ void sched_tick(void) {
     if (!preempt_on)
         return;
 
-    /* Wake sleepers whose deadline passed (wraparound-safe comparison). */
+    /* Wake sleepers, but only scan when the earliest cached deadline is
+     * actually due (wraparound-safe comparisons throughout). */
     uint32_t now = timer_ticks();
-    for (int i = 1; i < MAX_TASKS; i++)
-        if (tasks[i].state == TASK_BLOCKED &&
-            (int32_t)(now - tasks[i].wake_at) >= 0)
-            tasks[i].state = TASK_READY;
+    if (have_sleepers && (int32_t)(now - next_wake) >= 0) {
+        int any = 0;
+        uint32_t earliest = 0;
+        for (int i = 1; i < MAX_TASKS; i++) {
+            if (tasks[i].state != TASK_BLOCKED)
+                continue;
+            if ((int32_t)(now - tasks[i].wake_at) >= 0) {
+                tasks[i].state = TASK_READY;
+            } else if (!any || (int32_t)(tasks[i].wake_at - earliest) < 0) {
+                earliest = tasks[i].wake_at;
+                any = 1;
+            }
+        }
+        have_sleepers = any;
+        next_wake = earliest;
+    }
 
     schedule();
 }
@@ -177,6 +207,9 @@ void sched_tick(void) {
  * and the scheduler picked the task again. */
 void sched_sleep_current(uint32_t nticks) {
     current->wake_at = timer_ticks() + nticks;
+    if (!have_sleepers || (int32_t)(current->wake_at - next_wake) < 0)
+        next_wake = current->wake_at;
+    have_sleepers = 1;
     current->state = TASK_BLOCKED;
     schedule();
 }
@@ -198,6 +231,17 @@ void sched_wake_keyboard(void) {
 
 void sched_set_foreground(uint32_t pid) {
     fg_pid = pid;
+}
+
+/* Ctrl+C from the keyboard IRQ: kill the foreground task (if any) and
+ * reschedule immediately so a CPU-bound victim stops on the spot. */
+void sched_interrupt_foreground(void) {
+    uint32_t pid = fg_pid;
+    if (pid == 0)
+        return; /* kernel shell has the keyboard: nothing to interrupt */
+    kprintf("^C\n");
+    if (sched_kill(pid) == 0 && preempt_on)
+        schedule();
 }
 
 /* Wake tasks blocked in sys_wait on this pid. */
@@ -267,14 +311,13 @@ int sched_kill(uint32_t pid) {
 void sched_ps(void) {
     static const char *const names[] = {"free",    "ready",   "blocked",
                                         "waitkbd", "waitpid", "zombie"};
-    kprintf("  PID  STATE\n");
+    kprintf("  PID  STATE    NAME\n");
     for (int i = 0; i < MAX_TASKS; i++) {
         if (i != 0 && tasks[i].state == TASK_FREE)
             continue;
         const char *st =
             (&tasks[i] == current) ? "running" : names[tasks[i].state];
-        kprintf("%5lu  %s%s\n", tasks[i].pid, st,
-                i == 0 ? " (shell/idle)" : "");
+        kprintf("%5lu  %s  %s\n", tasks[i].pid, st, tasks[i].name);
     }
 }
 

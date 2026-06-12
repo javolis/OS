@@ -86,7 +86,16 @@ int process_spawn(const char *image_start, const char *image_end,
     uint32_t user_esp = build_user_stack(stk, cmdline);
     paging_map_user_in(dir, USER_STACK_VADDR, stack_frame, 1);
 
-    int pid = sched_spawn_user(dir, entry, user_esp, foreground);
+    /* argv[0] (the first cmdline word) doubles as the ps name. */
+    char name[16];
+    uint32_t n = 0;
+    while (cmdline[n] && cmdline[n] != ' ' && n < sizeof(name) - 1) {
+        name[n] = cmdline[n];
+        n++;
+    }
+    name[n] = '\0';
+
+    int pid = sched_spawn_user(dir, entry, user_esp, foreground, name);
     if (pid < 0) {
         paging_destroy_address_space(dir); /* frees segments + stack too */
         return -1;

@@ -52,7 +52,10 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                e c h o dot e l f spc h i spc f r o m spc u s h ret \
                e x i t ret \
                e c h o spc b a c k ret \
-               r u n spc s y s i n f o dot e l f ret; do
+               r u n spc s y s i n f o dot e l f ret \
+               r u n spc c l o c k dot e l f ret \
+               ctrl-c \
+               e c h o spc i n t a c t ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -277,6 +280,21 @@ if grep -qE "sysinfo: ticks=[0-9]+ frames=[0-9]+/[0-9]+ tasks=[0-9]+" "$SERIAL_L
     echo "PASS: user libc formatted sysinfo output"
 else
     echo "FAIL: sysinfo output missing or malformed" >&2
+    fail=1
+fi
+
+# Ctrl+C: a foreground clock is interrupted mid-run; the ^C marker
+# appears and the shell answers afterwards. 'clock: done' must still be
+# seen exactly once (kill-test run) — this third clock never finishes.
+ctrlc_line=$(grep -nF "^C" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+intact_line=$(grep -nx "intact" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+final_done_count=$(grep -c "clock: done" "$SERIAL_LOG")
+if [ -n "$ctrlc_line" ] && [ -n "$intact_line" ] \
+        && [ "$ctrlc_line" -lt "$intact_line" ] \
+        && [ "$final_done_count" -eq 1 ]; then
+    echo "PASS: Ctrl+C killed the foreground task (shell intact)"
+else
+    echo "FAIL: Ctrl+C handling broken (done=${final_done_count}x)" >&2
     fail=1
 fi
 

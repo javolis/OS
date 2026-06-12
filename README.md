@@ -30,7 +30,9 @@ programs live with arguments — argc/argv are built on the user stack per
 the C ABI; foreground programs own the keyboard (sys_readline gives them
 line-edited input) while `run ... &` runs in the background (zombies are
 reaped at the prompt; kprintf is interrupt-atomic so output lines never
-interleave; ps shows the task table and kill terminates a task by pid). User code talks to the kernel via int 0x80 (write / exit / sleep / getpid / readline /
+interleave; ps shows the task table with names; kill terminates a task
+by pid and Ctrl+C kills the foreground task). User code talks to the
+kernel via int 0x80 (write / exit / sleep / getpid / readline /
 spawn / wait / sysinfo — user programs can launch and wait on other
 programs, and ush.elf is a complete shell running in ring 3, with a tiny
 user libc providing uprintf); sleep blocks properly — the scheduler runs other tasks,
