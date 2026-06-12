@@ -1,5 +1,6 @@
 /* shell.c — tiny interactive shell: line-buffered input with backspace
- * editing on top of keyboard_getchar(), and a few built-in commands. */
+ * editing and arrow-key history on top of keyboard_getchar(), and a few
+ * built-in commands. History lines live on the kernel heap. */
 #include <stddef.h>
 #include <stdint.h>
 
@@ -13,6 +14,10 @@
 #include "timer.h"
 
 #define LINE_MAX 80
+#define HISTORY_MAX 16
+
+static char *history[HISTORY_MAX]; /* oldest first, kmalloc'd copies */
+static uint32_t history_len;
 
 static int streq(const char *a, const char *b) {
     while (*a && *a == *b) {
@@ -22,9 +27,70 @@ static int streq(const char *a, const char *b) {
     return *a == *b;
 }
 
-/* Read one line with echo and backspace editing; NUL-terminates buf. */
+static uint32_t copy_str(char *dst, const char *src, uint32_t max) {
+    uint32_t n = 0;
+    while (src[n] && n + 1 < max) {
+        dst[n] = src[n];
+        n++;
+    }
+    dst[n] = '\0';
+    return n;
+}
+
+/* Parse an unsigned decimal number; returns 0 on any non-digit input. */
+static int parse_u32(const char *s, uint32_t *out) {
+    if (!*s)
+        return 0;
+    uint32_t v = 0;
+    for (; *s; s++) {
+        if (*s < '0' || *s > '9')
+            return 0;
+        v = v * 10 + (uint32_t)(*s - '0');
+    }
+    *out = v;
+    return 1;
+}
+
+static void history_add(const char *line) {
+    if (!*line)
+        return;
+    if (history_len > 0 && streq(history[history_len - 1], line))
+        return; /* skip consecutive duplicates */
+
+    uint32_t n = 0;
+    while (line[n])
+        n++;
+    char *copy = kmalloc(n + 1);
+    if (!copy)
+        return; /* heap full: silently keep no history for this line */
+    copy_str(copy, line, n + 1);
+
+    if (history_len == HISTORY_MAX) {
+        kfree(history[0]);
+        for (uint32_t i = 1; i < HISTORY_MAX; i++)
+            history[i - 1] = history[i];
+        history_len--;
+    }
+    history[history_len++] = copy;
+}
+
+static void echo_char(char c) {
+    kprintf("%c", c);
+}
+
+static void erase_chars(size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        term_putchar('\b');    /* erases the cell on VGA */
+        serial_write("\b \b"); /* erase on a serial terminal */
+    }
+}
+
+/* Read one line with echo, backspace editing, and up/down history
+ * recall; NUL-terminates buf. */
 static void readline(char *buf, size_t size) {
     size_t len = 0;
+    uint32_t hist_pos = history_len; /* == history_len means a fresh line */
+
     for (;;) {
         char c = keyboard_getchar();
 
@@ -36,16 +102,35 @@ static void readline(char *buf, size_t size) {
         if (c == '\b') {
             if (len > 0) {
                 len--;
-                term_putchar('\b');    /* erases the cell on VGA */
-                serial_write("\b \b"); /* erase on a serial terminal */
+                erase_chars(1);
+            }
+            continue;
+        }
+        if (c == KEY_UP || c == KEY_DOWN) {
+            if (c == KEY_UP) {
+                if (hist_pos == 0)
+                    continue;
+                hist_pos--;
+            } else {
+                if (hist_pos == history_len)
+                    continue;
+                hist_pos++;
+            }
+            erase_chars(len);
+            if (hist_pos == history_len) {
+                len = 0; /* back below the newest entry: empty line */
+            } else {
+                len = copy_str(buf, history[hist_pos], size);
+                for (size_t i = 0; i < len; i++)
+                    echo_char(buf[i]);
             }
             continue;
         }
         if (c == '\t')
             c = ' ';
-        if (len + 1 < size) {
+        if ((unsigned char)c < 0x80 && len + 1 < size) {
             buf[len++] = c;
-            kprintf("%c", c);
+            echo_char(c);
         }
     }
 }
@@ -57,6 +142,7 @@ void shell_run(void) {
     for (;;) {
         kprintf("> ");
         readline(line, sizeof(line));
+        history_add(line);
 
         /* Split off the first word; rest points at the arguments, if any. */
         char *cmd = line;
@@ -75,7 +161,8 @@ void shell_run(void) {
             continue;
 
         if (streq(cmd, "help"))
-            kprintf("commands: help echo clear ticks meminfo\n");
+            kprintf("commands: help echo clear ticks meminfo sleep uptime "
+                    "history\n");
         else if (streq(cmd, "echo"))
             kprintf("%s\n", rest);
         else if (streq(cmd, "clear"))
@@ -89,6 +176,21 @@ void shell_run(void) {
             uint32_t heap_used, heap_total;
             kheap_stats(&heap_used, &heap_total);
             kprintf("heap: %lu of %lu bytes used\n", heap_used, heap_total);
+        } else if (streq(cmd, "sleep")) {
+            uint32_t ms;
+            if (parse_u32(rest, &ms)) {
+                timer_sleep(ms);
+                kprintf("slept %lu ms\n", ms);
+            } else {
+                kprintf("usage: sleep <milliseconds>\n");
+            }
+        } else if (streq(cmd, "uptime")) {
+            uint32_t t = timer_ticks();
+            kprintf("up %lu.%02lu s (%lu ticks at 100 Hz)\n", t / 100,
+                    t % 100, t);
+        } else if (streq(cmd, "history")) {
+            for (uint32_t i = 0; i < history_len; i++)
+                kprintf("%2lu  %s\n", i + 1, history[i]);
         } else
             kprintf("unknown command: %s (try 'help')\n", cmd);
     }
