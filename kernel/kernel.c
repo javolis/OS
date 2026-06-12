@@ -1,10 +1,14 @@
 /* kernel.c — freestanding kernel entry. */
+#include <stdint.h>
+
 #include "gdt.h"
 #include "idt.h"
 #include "io.h"
 #include "keyboard.h"
 #include "kprintf.h"
+#include "multiboot.h"
 #include "pic.h"
+#include "pmm.h"
 #include "serial.h"
 #include "shell.h"
 #include "term.h"
@@ -14,7 +18,12 @@
 #error "This kernel must be built with a cross-compiler, not the host toolchain."
 #endif
 
-void kernel_main(void) {
+static void __attribute__((noreturn)) halt_forever(void) {
+    for (;;)
+        __asm__ volatile("cli; hlt");
+}
+
+void kernel_main(uint32_t magic, const struct multiboot_info *mbi) {
     term_init();
     serial_init();
     gdt_init();
@@ -23,6 +32,18 @@ void kernel_main(void) {
 
     kprintf("Hello from the kernel!\n");
     kprintf("GDT loaded; IDT loaded, exceptions handled.\n");
+
+    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+        kprintf("PANIC: bad multiboot magic %08lx\n", magic);
+        halt_forever();
+    }
+    if (!(mbi->flags & MULTIBOOT_INFO_MEM_MAP)) {
+        kprintf("PANIC: bootloader provided no memory map\n");
+        halt_forever();
+    }
+    pmm_init(mbi);
+    kprintf("Memory: %lu MiB usable (%lu of %lu frames).\n",
+            pmm_free_frames() / 256, pmm_free_frames(), pmm_total_frames());
 
     /* Prove the IDT actually works: int3 lands in isr_handler (which prints
      * and resumes). If interrupt dispatch is broken we fault here and never

@@ -30,13 +30,13 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 # pacing the keys so press/release pairs don't overlap.
 {
     sleep 5
-    for key in h e l p ret; do
+    for key in h e l p ret m e m i n f o ret; do
         echo "sendkey $key"
         sleep 0.3
     done
     sleep 1
     echo "quit"
-} | timeout 40 qemu-system-i386 \
+} | timeout 60 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
@@ -62,6 +62,13 @@ if grep -q "commands: help" "$SERIAL_LOG"; then
     echo "PASS: shell answered 'help'"
 else
     echo "FAIL: shell did not answer the 'help' command" >&2
+    fail=1
+fi
+
+if grep -q "frames free" "$SERIAL_LOG"; then
+    echo "PASS: physical memory manager reported frame stats"
+else
+    echo "FAIL: no frame stats from 'meminfo'" >&2
     fail=1
 fi
 

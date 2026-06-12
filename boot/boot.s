@@ -24,8 +24,10 @@ global _start:function (_start.end - _start)
 _start:
     mov esp, stack_top         ; set up the stack
 
+    push ebx                   ; multiboot info pointer (from GRUB)
+    push eax                   ; bootloader magic (from GRUB)
     extern kernel_main
-    call kernel_main           ; hand off to C
+    call kernel_main           ; kernel_main(magic, mbi)
 
 .hang:
     cli

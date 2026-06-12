@@ -6,6 +6,10 @@ SECTIONS
     /* GRUB loads the kernel at 1 MiB, a conventional spot above low memory. */
     . = 1M;
 
+    /* Image bounds, used by the physical memory manager to reserve the
+     * kernel's own frames. */
+    kernel_start = .;
+
     /* The multiboot header must come early so GRUB can find it. */
     .text BLOCK(4K) : ALIGN(4K)
     {
@@ -28,4 +32,6 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
+
+    kernel_end = .;
 }
