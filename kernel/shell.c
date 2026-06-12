@@ -169,22 +169,40 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls run ps\n");
+                    "history ls run ps kill\n");
         else if (streq(cmd, "ps"))
             sched_ps();
         else if (streq(cmd, "ls"))
             initrd_list();
         else if (streq(cmd, "run")) {
             if (*rest == '\0') {
-                kprintf("usage: run <file> (see 'ls')\n");
+                kprintf("usage: run <file> [args...] (see 'ls')\n");
             } else {
+                /* First word is the file name; the full rest (file name
+                 * included) becomes the program's argv. */
+                char fname[32];
+                uint32_t n = 0;
+                while (rest[n] && rest[n] != ' ' && n + 1 < sizeof(fname)) {
+                    fname[n] = rest[n];
+                    n++;
+                }
+                fname[n] = '\0';
+
                 uint32_t size;
-                const char *img = initrd_find(rest, &size);
+                const char *img = initrd_find(fname, &size);
                 if (!img)
-                    kprintf("run: %s: not found (try 'ls')\n", rest);
-                else if (process_spawn(img, img + size) < 0)
-                    kprintf("run: %s: spawn failed\n", rest);
+                    kprintf("run: %s: not found (try 'ls')\n", fname);
+                else if (process_spawn(img, img + size, rest) < 0)
+                    kprintf("run: %s: spawn failed\n", fname);
             }
+        } else if (streq(cmd, "kill")) {
+            uint32_t pid;
+            if (!parse_u32(rest, &pid))
+                kprintf("usage: kill <pid> (see 'ps')\n");
+            else if (sched_kill(pid) == 0)
+                kprintf("killed pid %lu\n", pid);
+            else
+                kprintf("kill: no such task: %lu\n", pid);
         }
         else if (streq(cmd, "echo"))
             kprintf("%s\n", rest);

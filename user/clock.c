@@ -4,7 +4,7 @@
 #include "usys.h"
 
 void _start(void) {
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
         sys_write("clock: tick\n");
         sys_sleep(300);
     }

@@ -157,6 +157,20 @@ uint32_t sched_current_pid(void) {
     return current->pid;
 }
 
+/* Kill a (non-running) user task by pid: marked zombie, never scheduled
+ * again, reclaimed by the next sched_reap. Only the shell calls this and
+ * the shell is the running task, so the target is always off-CPU. */
+int sched_kill(uint32_t pid) {
+    for (int i = 1; i < MAX_TASKS; i++) {
+        if (tasks[i].pid == pid && (tasks[i].state == TASK_READY ||
+                                    tasks[i].state == TASK_BLOCKED)) {
+            tasks[i].state = TASK_ZOMBIE;
+            return 0;
+        }
+    }
+    return -1;
+}
+
 void sched_ps(void) {
     static const char *const names[] = {"free", "ready", "blocked",
                                         "zombie"};

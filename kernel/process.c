@@ -1,6 +1,6 @@
 /* process.c — user processes: load an ELF executable into a private
- * address space (own page directory, kernel half shared) and hand it to
- * the scheduler. */
+ * address space (own page directory, kernel half shared), build its
+ * argc/argv on the user stack, and hand it to the scheduler. */
 #include <stdint.h>
 
 #include "elf.h"
@@ -12,11 +12,58 @@
 #include "sched.h"
 
 #define FRAME_SIZE 4096u
+#define MAX_ARGS 8
 
 /* One stack page, well clear of where the executables link (0x08048000+). */
 #define USER_STACK_VADDR 0x0BFFF000u
 
-int process_spawn(const char *image_start, const char *image_end) {
+/* Build the initial user stack inside the (kernel-visible) stack frame:
+ * argument strings at the top, the argv vector below them, then the
+ * argc/argv parameters and a fake return address so _start(argc, argv)
+ * reads them per the C calling convention. Returns the initial user esp. */
+static uint32_t build_user_stack(uint8_t *stk, const char *cmdline) {
+    uint32_t top = FRAME_SIZE;
+    uint32_t uargv[MAX_ARGS];
+    uint32_t argc = 0;
+
+    const char *p = cmdline;
+    while (*p && argc < MAX_ARGS) {
+        while (*p == ' ')
+            p++;
+        if (!*p)
+            break;
+        uint32_t len = 0;
+        while (p[len] && p[len] != ' ')
+            len++;
+
+        top -= len + 1;
+        for (uint32_t i = 0; i < len; i++)
+            stk[top + i] = (uint8_t)p[i];
+        stk[top + len] = '\0';
+        uargv[argc++] = USER_STACK_VADDR + top;
+        p += len;
+    }
+
+    top &= ~3u; /* align for the pointer vector */
+    top -= 4 * (argc + 1);
+    uint32_t *vec = (uint32_t *)(stk + top);
+    for (uint32_t i = 0; i < argc; i++)
+        vec[i] = uargv[i];
+    vec[argc] = 0;
+    uint32_t argv_uaddr = USER_STACK_VADDR + top;
+
+    top -= 4;
+    *(uint32_t *)(stk + top) = argv_uaddr;
+    top -= 4;
+    *(uint32_t *)(stk + top) = argc;
+    top -= 4;
+    *(uint32_t *)(stk + top) = 0; /* fake return address for _start */
+
+    return USER_STACK_VADDR + top;
+}
+
+int process_spawn(const char *image_start, const char *image_end,
+                  const char *cmdline) {
     uint32_t size = (uint32_t)(image_end - image_start);
 
     uint32_t dir = paging_new_address_space();
@@ -31,10 +78,15 @@ int process_spawn(const char *image_start, const char *image_end) {
         paging_destroy_address_space(dir);
         return -1;
     }
+    /* Zero the recycled frame — no leaking another process's old data. */
+    uint8_t *stk = phys_to_virt(stack_frame);
+    for (uint32_t i = 0; i < FRAME_SIZE; i++)
+        stk[i] = 0;
+
+    uint32_t user_esp = build_user_stack(stk, cmdline);
     paging_map_user_in(dir, USER_STACK_VADDR, stack_frame, 1);
 
-    int pid = sched_spawn_user(dir, entry,
-                               USER_STACK_VADDR + FRAME_SIZE - 16);
+    int pid = sched_spawn_user(dir, entry, user_esp);
     if (pid < 0) {
         paging_destroy_address_space(dir); /* frees segments + stack too */
         return -1;

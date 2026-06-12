@@ -41,13 +41,16 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c l o c k dot e l f ret \
                p s ret \
                r u n spc c r a s h dot e l f ret \
-               e c h o spc s u r v i v e d ret; do
+               e c h o spc s u r v i v e d ret \
+               r u n spc e c h o dot e l f spc p r o o f spc o f spc a r g v ret \
+               r u n spc c l o c k dot e l f ret \
+               k i l l spc 7 ret; do
         echo "sendkey $key"
         sleep 0.3
     done
     sleep 4
     echo "quit"
-} | timeout 90 qemu-system-i386 \
+} | timeout 120 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
@@ -196,6 +199,25 @@ if [ -n "$kill_line" ] && [ -n "$survived_line" ] && [ "$kill_line" -lt "$surviv
     echo "PASS: shell survived the user crash"
 else
     echo "FAIL: shell did not respond after the crash" >&2
+    fail=1
+fi
+
+# argv round trip: echo.elf prints exactly its arguments on their own
+# line (the typed command itself appears only with the '> run ' prefix).
+if grep -q "^proof of argv" "$SERIAL_LOG"; then
+    echo "PASS: argc/argv reached the user program"
+else
+    echo "FAIL: echo.elf did not print its arguments" >&2
+    fail=1
+fi
+
+# kill: the second clock instance (pid 7) dies mid-run, so 'clock: done'
+# appears exactly once — from the first, completed run.
+done_count=$(grep -c "clock: done" "$SERIAL_LOG")
+if grep -q "killed pid 7" "$SERIAL_LOG" && [ "$done_count" -eq 1 ]; then
+    echo "PASS: kill stopped a running process (done seen ${done_count}x)"
+else
+    echo "FAIL: kill did not stop the process (done seen ${done_count}x)" >&2
     fail=1
 fi
 

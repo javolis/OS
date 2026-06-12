@@ -26,5 +26,8 @@ uint32_t sched_current_pid(void);
 /* Print the task table via kprintf (the shell's ps command). */
 void sched_ps(void);
 
+/* Mark a ready/blocked user task zombie. 0 on success, -1 if no match. */
+int sched_kill(uint32_t pid);
+
 /* Terminate the calling task (used by the exit syscall). */
 void task_exit(void) __attribute__((noreturn));
