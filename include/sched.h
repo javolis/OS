@@ -38,6 +38,9 @@ uint32_t sched_foreground_pid(void);
 
 int sched_pid_alive(uint32_t pid);
 
+/* Number of live user tasks. */
+uint32_t sched_alive_count(void);
+
 uint32_t sched_current_pid(void);
 
 /* Print the task table via kprintf (the shell's ps command). */

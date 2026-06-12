@@ -6,11 +6,13 @@
 #include "kprintf.h"
 #include "memlayout.h"
 #include "paging.h"
+#include "pmm.h"
 #include "process.h"
 #include "sched.h"
 #include "serial.h"
 #include "syscall.h"
 #include "term.h"
+#include "timer.h"
 
 #define SYS_WRITE_MAX 1024
 #define SPAWN_CMDLINE_MAX 128
@@ -172,6 +174,20 @@ void syscall_handle(struct registers *regs) {
         sched_wait_pid(regs->ebx);
         regs->eax = 0;
         return;
+
+    case SYS_SYSINFO: {
+        if (!user_range_writable(regs->ebx, sizeof(struct sysinfo))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct sysinfo *si = (struct sysinfo *)regs->ebx;
+        si->ticks = timer_ticks();
+        si->free_frames = pmm_free_frames();
+        si->total_frames = pmm_total_frames();
+        si->tasks_alive = sched_alive_count();
+        regs->eax = 0;
+        return;
+    }
 
     default:
         regs->eax = (uint32_t)-1;

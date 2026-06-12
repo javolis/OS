@@ -31,8 +31,9 @@ the C ABI; foreground programs own the keyboard (sys_readline gives them
 line-edited input) while `run ... &` runs in the background (zombies are
 reaped at the prompt; kprintf is interrupt-atomic so output lines never
 interleave; ps shows the task table and kill terminates a task by pid). User code talks to the kernel via int 0x80 (write / exit / sleep / getpid / readline /
-spawn / wait — user programs can launch and wait on other programs, and
-ush.elf is a complete shell running in ring 3); sleep blocks properly — the scheduler runs other tasks,
+spawn / wait / sysinfo — user programs can launch and wait on other
+programs, and ush.elf is a complete shell running in ring 3, with a tiny
+user libc providing uprintf); sleep blocks properly — the scheduler runs other tasks,
 including the shell, until the wake tick. Faults are isolated: a ring-3
 exception kills only the offending task (text/rodata segments are mapped
 read-only per ELF flags, and syscalls validate user pointers), while

@@ -57,3 +57,17 @@ static inline int sys_wait(int pid) {
     __asm__ volatile("int $0x80" : "=a"(ret) : "a"(6), "b"(pid));
     return ret;
 }
+
+/* Keep in sync with the kernel's struct sysinfo in include/syscall.h. */
+struct sysinfo {
+    unsigned int ticks; /* PIT ticks since boot (100 Hz) */
+    unsigned int free_frames;
+    unsigned int total_frames;
+    unsigned int tasks_alive;
+};
+
+static inline int sys_sysinfo(struct sysinfo *out) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(7), "b"(out) : "memory");
+    return ret;
+}
