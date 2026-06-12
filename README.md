@@ -11,7 +11,8 @@ Multiboot protocol (GRUB), installs its own GDT and IDT (with handlers for
 all 32 CPU exceptions), and prints to the VGA text buffer and COM1 serial
 via a small `kprintf`. Unhandled exceptions panic with a register dump
 instead of triple-faulting. The 8259 PIC is remapped and hardware IRQs are
-live: a 100 Hz PIT tick and a PS/2 keyboard that echoes keystrokes.
+live: a 100 Hz PIT tick and a PS/2 keyboard feeding a tiny interactive
+shell (help / echo / clear / ticks) with line editing.
 
 ## Prerequisites (Linux dev host)
 
@@ -31,7 +32,7 @@ https://wiki.osdev.org/GCC_Cross-Compiler (recommended over the host gcc).
 make            # build the kernel
 make iso        # produce a bootable os.iso
 make run        # boot the ISO in QEMU
-make test       # headless smoke test (boot marker + keyboard echo)
+make test       # headless smoke test (boot marker + shell responds)
 make clean
 ```
 
