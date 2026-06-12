@@ -102,6 +102,15 @@ else
     fail=1
 fi
 
+# The int3 self-test prints the faulting eip; in the higher half the kernel
+# executes at 0xC01xxxxx, so the address must start with c01.
+if grep -q "breakpoint at eip=c01" "$SERIAL_LOG"; then
+    echo "PASS: kernel executes in the higher half"
+else
+    echo "FAIL: kernel eip is not in the higher half" >&2
+    fail=1
+fi
+
 # Up-arrow history recall re-runs 'help', so its response must appear twice.
 help_count=$(grep -c "commands: help" "$SERIAL_LOG")
 if [ "$help_count" -ge 2 ]; then

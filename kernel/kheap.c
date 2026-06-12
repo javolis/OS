@@ -14,8 +14,9 @@
 #include "paging.h"
 #include "pmm.h"
 
-#define KHEAP_START 0xD0000000u
-#define KHEAP_MAX 0xD0400000u /* 4 MiB cap, easy to raise later */
+/* Above the 512 MiB offset-mapped RAM window that starts at 0xC0000000. */
+#define KHEAP_START 0xE0000000u
+#define KHEAP_MAX 0xE0400000u /* 4 MiB cap, easy to raise later */
 #define PAGE_SIZE 4096u
 
 struct block {

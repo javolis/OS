@@ -7,6 +7,7 @@
 #include "keyboard.h"
 #include "kheap.h"
 #include "kprintf.h"
+#include "memlayout.h"
 #include "multiboot.h"
 #include "paging.h"
 #include "pic.h"
@@ -25,14 +26,18 @@ static void __attribute__((noreturn)) halt_forever(void) {
         __asm__ volatile("cli; hlt");
 }
 
-void kernel_main(uint32_t magic, const struct multiboot_info *mbi) {
+void kernel_main(uint32_t magic, uint32_t mbi_phys) {
+    /* GRUB hands over a physical pointer; reach it through the
+     * higher-half window. */
+    const struct multiboot_info *mbi = phys_to_virt(mbi_phys);
+
     term_init();
     serial_init();
     gdt_init();
     pic_init();
     idt_init();
 
-    kprintf("Hello from the kernel!\n");
+    kprintf("Hello from the higher-half kernel!\n");
     kprintf("GDT loaded; IDT loaded, exceptions handled.\n");
 
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
@@ -48,7 +53,7 @@ void kernel_main(uint32_t magic, const struct multiboot_info *mbi) {
             pmm_free_frames() / 256, pmm_free_frames(), pmm_total_frames());
 
     paging_init();
-    kprintf("Paging enabled: %lu MiB identity-mapped.\n",
+    kprintf("Paging enabled: %lu MiB mapped in the higher half.\n",
             pmm_total_frames() / 256);
 
     kheap_init();

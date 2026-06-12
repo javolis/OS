@@ -10,15 +10,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "memlayout.h"
 #include "multiboot.h"
 #include "pmm.h"
 
 #define FRAME_SIZE 4096u
 
-/* Image bounds provided by linker.ld. */
+/* Image bounds provided by linker.ld (higher-half virtual addresses). */
 extern char kernel_start[], kernel_end[];
 
-static uint8_t *bitmap;
+static uint8_t *bitmap; /* higher-half pointer to the bitmap */
+static uint32_t bitmap_phys;
 static uint32_t bitmap_bytes;
 static uint32_t total_frames;
 static uint32_t free_count;
@@ -43,12 +45,15 @@ static void mark_free(uint32_t frame) {
 }
 
 /* Walk the Multiboot memory map; entries are variable-sized, with `size`
- * not counting the size field itself. */
-#define MMAP_FIRST(mbi) ((const struct multiboot_mmap_entry *)(mbi)->mmap_addr)
+ * not counting the size field itself. GRUB hands over physical addresses,
+ * accessed here through the higher-half window. */
+#define MMAP_FIRST(mbi) \
+    ((const struct multiboot_mmap_entry *)phys_to_virt((mbi)->mmap_addr))
 #define MMAP_NEXT(e) \
     ((const struct multiboot_mmap_entry *)((const uint8_t *)(e) + (e)->size + 4))
 #define MMAP_END(mbi) \
-    ((const struct multiboot_mmap_entry *)((mbi)->mmap_addr + (mbi)->mmap_length))
+    ((const struct multiboot_mmap_entry *)((const uint8_t *)MMAP_FIRST(mbi) + \
+                                           (mbi)->mmap_length))
 
 void pmm_init(const struct multiboot_info *mbi) {
     /* Highest usable physical address, clamped to the 32-bit space. */
@@ -66,8 +71,9 @@ void pmm_init(const struct multiboot_info *mbi) {
     total_frames = (uint32_t)(max_addr / FRAME_SIZE);
 
     /* Bitmap goes on the first frame boundary after the kernel image. */
-    bitmap = (uint8_t *)(((uint32_t)kernel_end + FRAME_SIZE - 1) &
-                         ~(FRAME_SIZE - 1));
+    bitmap_phys = (virt_to_phys(kernel_end) + FRAME_SIZE - 1) &
+                  ~(FRAME_SIZE - 1);
+    bitmap = phys_to_virt(bitmap_phys);
     bitmap_bytes = (total_frames + 7) / 8;
 
     /* Start with everything reserved... */
@@ -91,17 +97,22 @@ void pmm_init(const struct multiboot_info *mbi) {
             mark_free(f);
     }
 
-    /* ...then re-reserve what's already occupied. */
+    /* ...then re-reserve what's already occupied. Low memory also covers
+     * the Multiboot structures; the image reservation starts at 1 MiB to
+     * include the low-linked .boot section ahead of kernel_start. */
     for (uint32_t a = 0; a < 0x100000; a += FRAME_SIZE) /* low memory */
         mark_used(a / FRAME_SIZE);
-    for (uint32_t a = (uint32_t)kernel_start & ~(FRAME_SIZE - 1);
-         a < (uint32_t)kernel_end; a += FRAME_SIZE) /* kernel image */
+    for (uint32_t a = 0x100000; a < virt_to_phys(kernel_end);
+         a += FRAME_SIZE) /* .boot + kernel image */
         mark_used(a / FRAME_SIZE);
-    for (uint32_t a = (uint32_t)bitmap; a < (uint32_t)bitmap + bitmap_bytes;
+    for (uint32_t a = bitmap_phys; a < bitmap_phys + bitmap_bytes;
          a += FRAME_SIZE) /* the bitmap itself */
         mark_used(a / FRAME_SIZE);
 
-    next_hint = ((uint32_t)bitmap + bitmap_bytes) / FRAME_SIZE + 1;
+    /* Keep the scan cursor in low physical memory: paging_init rebuilds the
+     * page tables while only the first 4 MiB are mapped, so its frames must
+     * come from down here. */
+    next_hint = (bitmap_phys + bitmap_bytes) / FRAME_SIZE + 1;
 }
 
 uint32_t pmm_alloc_frame(void) {

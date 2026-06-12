@@ -4,11 +4,15 @@
 #include <stdint.h>
 
 #include "io.h"
+#include "memlayout.h"
 #include "term.h"
 
 static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
-static volatile uint16_t *const VGA_MEMORY = (uint16_t *)0xB8000;
+/* The VGA buffer sits at physical 0xB8000, reached via the higher-half
+ * offset mapping. */
+static volatile uint16_t *const VGA_MEMORY =
+    (uint16_t *)(KERNEL_VIRT_BASE + 0xB8000u);
 
 /* VGA color attribute: foreground=white, background=black. */
 static const uint8_t VGA_COLOR = 0x0F;
