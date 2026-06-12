@@ -70,9 +70,17 @@ void pmm_init(const struct multiboot_info *mbi) {
     }
     total_frames = (uint32_t)(max_addr / FRAME_SIZE);
 
-    /* Bitmap goes on the first frame boundary after the kernel image. */
-    bitmap_phys = (virt_to_phys(kernel_end) + FRAME_SIZE - 1) &
-                  ~(FRAME_SIZE - 1);
+    /* Bitmap goes on the first frame boundary after the kernel image —
+     * or after the highest boot module (GRUB usually drops modules right
+     * behind the kernel, exactly where the bitmap would otherwise go). */
+    uint32_t reserve_top = virt_to_phys(kernel_end);
+    if (mbi->flags & MULTIBOOT_INFO_MODS) {
+        const struct multiboot_mod *mods = phys_to_virt(mbi->mods_addr);
+        for (uint32_t i = 0; i < mbi->mods_count; i++)
+            if (mods[i].mod_end > reserve_top)
+                reserve_top = mods[i].mod_end;
+    }
+    bitmap_phys = (reserve_top + FRAME_SIZE - 1) & ~(FRAME_SIZE - 1);
     bitmap = phys_to_virt(bitmap_phys);
     bitmap_bytes = (total_frames + 7) / 8;
 
@@ -105,6 +113,13 @@ void pmm_init(const struct multiboot_info *mbi) {
     for (uint32_t a = 0x100000; a < virt_to_phys(kernel_end);
          a += FRAME_SIZE) /* .boot + kernel image */
         mark_used(a / FRAME_SIZE);
+    if (mbi->flags & MULTIBOOT_INFO_MODS) { /* boot modules (initrd) */
+        const struct multiboot_mod *mods = phys_to_virt(mbi->mods_addr);
+        for (uint32_t i = 0; i < mbi->mods_count; i++)
+            for (uint32_t a = mods[i].mod_start & ~(FRAME_SIZE - 1);
+                 a < mods[i].mod_end; a += FRAME_SIZE)
+                mark_used(a / FRAME_SIZE);
+    }
     for (uint32_t a = bitmap_phys; a < bitmap_phys + bitmap_bytes;
          a += FRAME_SIZE) /* the bitmap itself */
         mark_used(a / FRAME_SIZE);

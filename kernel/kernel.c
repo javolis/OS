@@ -3,6 +3,7 @@
 
 #include "gdt.h"
 #include "idt.h"
+#include "initrd.h"
 #include "io.h"
 #include "keyboard.h"
 #include "kheap.h"
@@ -77,6 +78,12 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     kfree(h1);
     kprintf("Kernel heap online (self-test passed).\n");
 
+    initrd_init(mbi);
+    if (!initrd_present()) {
+        kprintf("PANIC: initrd module missing (check grub.cfg)\n");
+        halt_forever();
+    }
+
     /* Prove the IDT actually works: int3 lands in isr_handler (which prints
      * and resumes). If interrupt dispatch is broken we fault here and never
      * reach the boot marker below, failing the smoke test. */
@@ -93,12 +100,18 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         __asm__ volatile("hlt");
     kprintf("PIT timer running at 100 Hz (%lu ticks).\n", timer_ticks());
 
-    /* Multitasking: load two CPU-bound user ELF executables and let the
-     * PIT preempt between them while this boot flow acts as the idle
-     * task. Their output interleaves; teardown must return every frame. */
+    /* Multitasking: load two CPU-bound user ELF executables from the
+     * initrd and let the PIT preempt between them while this boot flow
+     * acts as the idle task. Their output interleaves; teardown must
+     * return every frame. */
     {
-        extern char user_elf_a_start[], user_elf_a_end[];
-        extern char user_elf_b_start[], user_elf_b_end[];
+        uint32_t elf_a_size, elf_b_size;
+        const char *elf_a = initrd_find("hello_a.elf", &elf_a_size);
+        const char *elf_b = initrd_find("hello_b.elf", &elf_b_size);
+        if (!elf_a || !elf_b) {
+            kprintf("PANIC: user programs missing from the initrd\n");
+            halt_forever();
+        }
 
         /* Warm the heap to working size first: growth pages stay with the
          * heap after kfree, which would otherwise read as a frame leak. */
@@ -109,8 +122,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
 
         uint32_t frames_before = pmm_free_frames();
         sched_init();
-        if (process_spawn(user_elf_a_start, user_elf_a_end) < 0 ||
-            process_spawn(user_elf_b_start, user_elf_b_end) < 0) {
+        if (process_spawn(elf_a, elf_a + elf_a_size) < 0 ||
+            process_spawn(elf_b, elf_b + elf_b_size) < 0) {
             kprintf("PANIC: could not spawn user processes\n");
             halt_forever();
         }
