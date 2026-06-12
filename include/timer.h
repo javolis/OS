@@ -4,3 +4,6 @@
 
 void timer_init(uint32_t frequency_hz);
 uint32_t timer_ticks(void);
+
+/* Block for at least ms milliseconds (requires interrupts enabled). */
+void timer_sleep(uint32_t ms);

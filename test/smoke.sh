@@ -27,10 +27,15 @@ fi
 echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 
 # Feed monitor commands on a delay so the kernel has booted before we type,
-# pacing the keys so press/release pairs don't overlap.
+# pacing the keys so press/release pairs don't overlap. The sequence runs
+# 'help', 'meminfo', and 'sleep 50', then presses Up three times (history
+# recall back to 'help') and Enter to re-run it.
 {
     sleep 5
-    for key in h e l p ret m e m i n f o ret; do
+    for key in h e l p ret \
+               m e m i n f o ret \
+               s l e e p spc 5 0 ret \
+               up up up ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -87,6 +92,22 @@ if grep -q "self-test passed" "$SERIAL_LOG"; then
     echo "PASS: kernel heap self-test"
 else
     echo "FAIL: kernel heap self-test marker not found" >&2
+    fail=1
+fi
+
+if grep -q "slept 50 ms" "$SERIAL_LOG"; then
+    echo "PASS: sleep command completed"
+else
+    echo "FAIL: sleep command did not complete" >&2
+    fail=1
+fi
+
+# Up-arrow history recall re-runs 'help', so its response must appear twice.
+help_count=$(grep -c "commands: help" "$SERIAL_LOG")
+if [ "$help_count" -ge 2 ]; then
+    echo "PASS: history recall re-ran 'help' (seen ${help_count}x)"
+else
+    echo "FAIL: history recall did not re-run 'help' (seen ${help_count}x)" >&2
     fail=1
 fi
 

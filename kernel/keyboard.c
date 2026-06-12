@@ -49,6 +49,7 @@ static const char keymap_shift[128] = {
 };
 
 static int shift_held;
+static int e0_prefix; /* last byte was 0xE0 (extended-key prefix) */
 
 /* Ring buffer filled by the IRQ handler and drained by keyboard_getchar().
  * Single producer (the IRQ) / single consumer (the kernel main loop), so
@@ -58,15 +59,38 @@ static char kbd_buf[KBD_BUF_SIZE];
 static volatile size_t kbd_head; /* next write slot (IRQ handler) */
 static volatile size_t kbd_tail; /* next read slot (consumer) */
 
+static void push(char c) {
+    size_t next = (kbd_head + 1) % KBD_BUF_SIZE;
+    if (next == kbd_tail)
+        return; /* buffer full: drop the keystroke */
+    kbd_buf[kbd_head] = c;
+    kbd_head = next;
+}
+
 static void keyboard_irq(struct registers *regs) {
     (void)regs;
     uint8_t scancode = inb(KBD_DATA);
 
+    if (scancode == 0xE0) { /* extended key: next byte carries the code */
+        e0_prefix = 1;
+        return;
+    }
+
     if (scancode & SC_RELEASE) {
         uint8_t code = scancode & ~SC_RELEASE;
-        if (code == SC_LSHIFT || code == SC_RSHIFT)
+        if (!e0_prefix && (code == SC_LSHIFT || code == SC_RSHIFT))
             shift_held = 0;
+        e0_prefix = 0;
         return;
+    }
+
+    if (e0_prefix) {
+        e0_prefix = 0;
+        if (scancode == 0x48)
+            push(KEY_UP);
+        else if (scancode == 0x50)
+            push(KEY_DOWN);
+        return; /* other extended keys (right ctrl, etc.) still ignored */
     }
 
     if (scancode == SC_LSHIFT || scancode == SC_RSHIFT) {
@@ -75,14 +99,8 @@ static void keyboard_irq(struct registers *regs) {
     }
 
     char c = shift_held ? keymap_shift[scancode] : keymap[scancode];
-    if (!c)
-        return;
-
-    size_t next = (kbd_head + 1) % KBD_BUF_SIZE;
-    if (next == kbd_tail)
-        return; /* buffer full: drop the keystroke */
-    kbd_buf[kbd_head] = c;
-    kbd_head = next;
+    if (c)
+        push(c);
 }
 
 char keyboard_getchar(void) {

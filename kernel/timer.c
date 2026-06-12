@@ -33,3 +33,11 @@ void timer_init(uint32_t frequency_hz) {
 uint32_t timer_ticks(void) {
     return ticks;
 }
+
+void timer_sleep(uint32_t ms) {
+    /* 100 Hz -> 10 ms per tick; round up so short sleeps aren't zero. */
+    uint32_t target = ticks + (ms + 9) / 10;
+    /* Signed difference keeps this correct across tick-counter wraparound. */
+    while ((int32_t)(ticks - target) < 0)
+        __asm__ volatile("hlt");
+}
