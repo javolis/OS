@@ -3,16 +3,13 @@
 
 #include "kprintf.h"
 #include "memlayout.h"
+#include "sched.h"
 #include "syscall.h"
-
-/* boot/usermode.s — resumes the kernel context saved by enter_user_mode. */
-extern void kernel_resume(void) __attribute__((noreturn));
 
 void syscall_handle(struct registers *regs) {
     switch (regs->eax) {
     case SYS_EXIT:
-        kprintf("[user program exited]\n");
-        kernel_resume();
+        task_exit();
 
     case SYS_WRITE: {
         const char *s = (const char *)regs->ebx;

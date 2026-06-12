@@ -14,6 +14,7 @@
 #include "pmm.h"
 #include "serial.h"
 #include "process.h"
+#include "sched.h"
 #include "shell.h"
 #include "term.h"
 #include "timer.h"
@@ -92,19 +93,35 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         __asm__ volatile("hlt");
     kprintf("PIT timer running at 100 Hz (%lu ticks).\n", timer_ticks());
 
-    /* Run two user programs back to back, each in its own address space.
-     * Both are mapped at the same virtual address — isolation in action —
-     * and teardown must return every frame it took. */
+    /* Multitasking: spawn two CPU-bound user processes and let the PIT
+     * preempt between them while this boot flow acts as the idle task.
+     * Their output interleaves; teardown must return every frame. */
     {
         extern char user_prog_a_start[], user_prog_a_end[];
         extern char user_prog_b_start[], user_prog_b_end[];
 
+        /* Warm the heap to working size first: growth pages stay with the
+         * heap after kfree, which would otherwise read as a frame leak. */
+        void *warm_a = kmalloc(8192);
+        void *warm_b = kmalloc(8192);
+        kfree(warm_a);
+        kfree(warm_b);
+
         uint32_t frames_before = pmm_free_frames();
-        if (process_run(user_prog_a_start, user_prog_a_end) != 0 ||
-            process_run(user_prog_b_start, user_prog_b_end) != 0) {
-            kprintf("PANIC: could not stage a user process\n");
+        sched_init();
+        if (process_spawn(user_prog_a_start, user_prog_a_end) < 0 ||
+            process_spawn(user_prog_b_start, user_prog_b_end) < 0) {
+            kprintf("PANIC: could not spawn user processes\n");
             halt_forever();
         }
+        sched_start();
+        while (sched_user_tasks_alive())
+            __asm__ volatile("hlt"); /* idle until everything exits */
+        sched_stop();
+        sched_reap();
+        kprintf("[sched] %lu context switches; all user tasks finished\n",
+                sched_switch_count());
+
         if (pmm_free_frames() == frames_before)
             kprintf("Address spaces reclaimed cleanly.\n");
         else

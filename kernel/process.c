@@ -1,7 +1,5 @@
-/* process.c — minimal processes: each runs one user image to completion in
- * a private address space (own page directory, kernel half shared). Real
- * multitasking needs a scheduler; this establishes creation, isolation,
- * and teardown first. */
+/* process.c — user processes: stage an image into a private address space
+ * (own page directory, kernel half shared) and hand it to the scheduler. */
 #include <stdint.h>
 
 #include "kprintf.h"
@@ -9,7 +7,7 @@
 #include "paging.h"
 #include "pmm.h"
 #include "process.h"
-#include "usermode.h"
+#include "sched.h"
 
 #define FRAME_SIZE 4096u
 
@@ -17,9 +15,7 @@
 #define USER_CODE_VADDR 0x08048000u
 #define USER_STACK_VADDR 0x08070000u
 
-static uint32_t next_pid = 1;
-
-int process_run(const char *image_start, const char *image_end) {
+int process_spawn(const char *image_start, const char *image_end) {
     uint32_t size = (uint32_t)(image_end - image_start);
     if (size > FRAME_SIZE)
         return -1;
@@ -42,16 +38,12 @@ int process_run(const char *image_start, const char *image_end) {
     paging_map_user_in(dir, USER_CODE_VADDR, code_frame);
     paging_map_user_in(dir, USER_STACK_VADDR, stack_frame);
 
-    uint32_t pid = next_pid++;
-    kprintf("[pid %lu] entering ring 3\n", pid);
-
-    paging_switch(dir);
-    enter_user_mode(USER_CODE_VADDR, USER_STACK_VADDR + FRAME_SIZE - 16);
-    /* Back via the exit syscall; its interrupt gate left IF cleared. */
-    __asm__ volatile("sti");
-
-    paging_switch(paging_kernel_directory());
-    paging_destroy_address_space(dir); /* frees code, stack, tables, dir */
-    kprintf("[pid %lu] exited; address space reclaimed\n", pid);
-    return 0;
+    int pid = sched_spawn_user(dir, USER_CODE_VADDR,
+                               USER_STACK_VADDR + FRAME_SIZE - 16);
+    if (pid < 0) {
+        paging_destroy_address_space(dir); /* also frees code + stack */
+        return -1;
+    }
+    kprintf("[pid %d] spawned\n", pid);
+    return pid;
 }

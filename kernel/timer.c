@@ -4,6 +4,7 @@
 #include "io.h"
 #include "irq.h"
 #include "pic.h"
+#include "sched.h"
 #include "timer.h"
 
 #define PIT_CH0 0x40
@@ -15,6 +16,7 @@ static volatile uint32_t ticks;
 static void timer_irq(struct registers *regs) {
     (void)regs;
     ticks++;
+    sched_tick(); /* may context-switch away and return much later */
 }
 
 void timer_init(uint32_t frequency_hz) {
