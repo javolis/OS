@@ -47,7 +47,11 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                k i l l spc 7 ret \
                r u n spc g r e e t dot e l f ret \
                c i ret \
-               r u n spc r u n n e r dot e l f ret; do
+               r u n spc r u n n e r dot e l f ret \
+               r u n spc u s h dot e l f ret \
+               e c h o dot e l f spc h i spc f r o m spc u s h ret \
+               e x i t ret \
+               e c h o spc b a c k ret; do
         echo "sendkey $key"
         sleep 0.3
     done
@@ -243,6 +247,27 @@ if [ -n "$child_line" ] && [ -n "$fin_line" ] && [ "$child_line" -lt "$fin_line"
     echo "PASS: sys_spawn + sys_wait (child before parent continuation)"
 else
     echo "FAIL: spawn/wait ordering broken" >&2
+    fail=1
+fi
+
+# The user-mode shell: its prompt appears, a command typed INTO it runs a
+# child whose output comes back, and 'exit' returns the keyboard to the
+# kernel shell (which then answers 'echo back').
+if grep -q 'ush\$' "$SERIAL_LOG" \
+        && grep -v "echo.elf" "$SERIAL_LOG" | grep -q "hi from ush" \
+        && grep -q "ush: bye" "$SERIAL_LOG"; then
+    echo "PASS: user-mode shell ran a program and exited"
+else
+    echo "FAIL: user-mode shell session broken" >&2
+    fail=1
+fi
+
+bye_line=$(grep -n "ush: bye" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+back_line=$(grep -nx "back" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)
+if [ -n "$bye_line" ] && [ -n "$back_line" ] && [ "$bye_line" -lt "$back_line" ]; then
+    echo "PASS: kernel shell regained the keyboard after ush exited"
+else
+    echo "FAIL: kernel shell did not regain the keyboard" >&2
     fail=1
 fi
 
