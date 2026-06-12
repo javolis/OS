@@ -72,7 +72,8 @@ static void task_entry(void) {
     user_iret(current->user_eip, current->user_esp);
 }
 
-int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp) {
+int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
+                     int make_foreground) {
     /* Slot selection and pid assignment must not race with other spawners
      * (kernel shell with IF on vs. tasks inside the spawn syscall). */
     uint32_t flags = irq_save();
@@ -112,6 +113,12 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp) {
     *--sp = 0; /* edi */
     *--sp = 0; /* ebp */
     t->kesp = (uint32_t)sp;
+
+    /* Foreground must be assigned BEFORE the task becomes runnable: the
+     * scheduler may run it on the very next tick, and its first readline
+     * must already see itself as the keyboard owner. */
+    if (make_foreground)
+        fg_pid = t->pid;
 
     /* Publish last: a timer IRQ can run pick_next at any moment, and it
      * must not see READY before the fields above are in place. */

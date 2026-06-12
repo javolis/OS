@@ -5,8 +5,10 @@
 void sched_init(void);
 
 /* Register a user task: it first runs by ireting to user_eip:user_esp in
- * the given address space, on its own kernel stack. Returns pid or -1. */
-int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp);
+ * the given address space, on its own kernel stack. make_foreground hands
+ * it the keyboard atomically with becoming runnable. Returns pid or -1. */
+int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
+                     int make_foreground);
 
 void sched_start(void); /* enable timer-driven preemption */
 void sched_stop(void);
