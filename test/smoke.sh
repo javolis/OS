@@ -111,13 +111,21 @@ else
     fail=1
 fi
 
-# Printed by the embedded ring-3 program through the write syscall, then
-# the kernel confirms the exit syscall brought it back.
-if grep -q "Hello from ring 3" "$SERIAL_LOG" \
-        && grep -q "Back in ring 0" "$SERIAL_LOG"; then
-    echo "PASS: ring-3 round trip (user program + syscalls)"
+# Two user programs, each in its own address space but mapped at the same
+# virtual address, print through the write syscall and exit.
+if grep -q "process A says hello" "$SERIAL_LOG" \
+        && grep -q "process B says hello" "$SERIAL_LOG"; then
+    echo "PASS: two isolated user processes ran and exited"
 else
-    echo "FAIL: ring-3 round trip did not complete" >&2
+    echo "FAIL: user processes did not both run" >&2
+    fail=1
+fi
+
+# Printed only when teardown returned every frame the processes took.
+if grep -q "reclaimed cleanly" "$SERIAL_LOG"; then
+    echo "PASS: process address-space teardown leaked no frames"
+else
+    echo "FAIL: process teardown leaked frames" >&2
     fail=1
 fi
 

@@ -15,6 +15,12 @@
 
 #define KERNEL_VIRT_BASE 0xC0000000u
 
+/* Kernel heap region (one 4 MiB page-directory slot — its page table is
+ * preallocated at paging_init so process directories can share the kernel
+ * half by copying PDEs once at creation; see paging_new_address_space). */
+#define KHEAP_VIRT_BASE 0xE0000000u
+#define KHEAP_VIRT_LIMIT 0xE0400000u
+
 static inline void *phys_to_virt(uint32_t phys) {
     return (void *)(phys + KERNEL_VIRT_BASE);
 }
