@@ -16,6 +16,12 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
+/* Brief delay for slow devices (e.g. between 8259 PIC init writes): a write
+ * to port 0x80, unused except by POST diagnostics. */
+static inline void io_wait(void) {
+    outb(0x80, 0);
+}
+
 /* Ask QEMU's isa-debug-exit device to power off. Harmless on real hardware
  * (the port write is simply ignored when the device is absent). */
 static inline void qemu_exit(uint8_t code) {

@@ -10,7 +10,8 @@ Early bootstrap. A minimal freestanding i686 kernel that boots via the
 Multiboot protocol (GRUB), installs its own GDT and IDT (with handlers for
 all 32 CPU exceptions), and prints to the VGA text buffer and COM1 serial
 via a small `kprintf`. Unhandled exceptions panic with a register dump
-instead of triple-faulting.
+instead of triple-faulting. The 8259 PIC is remapped and hardware IRQs are
+live: a 100 Hz PIT tick and a PS/2 keyboard that echoes keystrokes.
 
 ## Prerequisites (Linux dev host)
 
