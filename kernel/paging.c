@@ -59,3 +59,18 @@ void paging_init(void) {
     cr0 |= 0x80000000u; /* CR0.PG */
     __asm__ volatile("mov %0, %%cr0" : : "r"(cr0));
 }
+
+void paging_map(uint32_t virt, uint32_t phys) {
+    uint32_t pd_idx = virt >> 22;
+    uint32_t pt_idx = (virt >> 12) & 0x3FF;
+
+    if (!(page_directory[pd_idx] & PAGE_PRESENT)) {
+        uint32_t *table = alloc_table();
+        page_directory[pd_idx] = (uint32_t)table | PAGE_PRESENT | PAGE_WRITE;
+    }
+    /* Page tables sit in identity-mapped RAM, so their physical address is
+     * also their virtual address. */
+    uint32_t *table = (uint32_t *)(page_directory[pd_idx] & ~0xFFFu);
+    table[pt_idx] = (phys & ~0xFFFu) | PAGE_PRESENT | PAGE_WRITE;
+    __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}

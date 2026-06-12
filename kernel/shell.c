@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "keyboard.h"
+#include "kheap.h"
 #include "kprintf.h"
 #include "pmm.h"
 #include "serial.h"
@@ -81,11 +82,14 @@ void shell_run(void) {
             term_init();
         else if (streq(cmd, "ticks"))
             kprintf("%lu ticks since boot (100 Hz)\n", timer_ticks());
-        else if (streq(cmd, "meminfo"))
+        else if (streq(cmd, "meminfo")) {
             kprintf("%lu/%lu frames free (%lu/%lu MiB)\n", pmm_free_frames(),
                     pmm_total_frames(), pmm_free_frames() / 256,
                     pmm_total_frames() / 256);
-        else
+            uint32_t heap_used, heap_total;
+            kheap_stats(&heap_used, &heap_total);
+            kprintf("heap: %lu of %lu bytes used\n", heap_used, heap_total);
+        } else
             kprintf("unknown command: %s (try 'help')\n", cmd);
     }
 }

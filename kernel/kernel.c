@@ -5,6 +5,7 @@
 #include "idt.h"
 #include "io.h"
 #include "keyboard.h"
+#include "kheap.h"
 #include "kprintf.h"
 #include "multiboot.h"
 #include "paging.h"
@@ -49,6 +50,25 @@ void kernel_main(uint32_t magic, const struct multiboot_info *mbi) {
     paging_init();
     kprintf("Paging enabled: %lu MiB identity-mapped.\n",
             pmm_total_frames() / 256);
+
+    kheap_init();
+    /* Self-test: the second allocation forces the heap to grow beyond its
+     * initial page, exercising pmm_alloc_frame + paging_map under PG=1. */
+    uint32_t *h1 = kmalloc(64);
+    uint32_t *h2 = kmalloc(8192);
+    if (!h1 || !h2) {
+        kprintf("PANIC: kmalloc failed during heap self-test\n");
+        halt_forever();
+    }
+    h1[0] = 0x12345678u;
+    h2[2047] = 0xCAFEBABEu;
+    if (h1[0] != 0x12345678u || h2[2047] != 0xCAFEBABEu) {
+        kprintf("PANIC: heap self-test read back corrupted data\n");
+        halt_forever();
+    }
+    kfree(h2);
+    kfree(h1);
+    kprintf("Kernel heap online (self-test passed).\n");
 
     /* Prove the IDT actually works: int3 lands in isr_handler (which prints
      * and resumes). If interrupt dispatch is broken we fault here and never

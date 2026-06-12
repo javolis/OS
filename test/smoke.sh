@@ -81,4 +81,13 @@ else
     fail=1
 fi
 
+# Printed only after kmalloc/kfree round-trips (including a heap growth
+# that maps fresh frames into the heap's virtual region).
+if grep -q "self-test passed" "$SERIAL_LOG"; then
+    echo "PASS: kernel heap self-test"
+else
+    echo "FAIL: kernel heap self-test marker not found" >&2
+    fail=1
+fi
+
 exit $fail
