@@ -11,7 +11,9 @@ LDFLAGS := -ffreestanding -O2 -nostdlib -T linker.ld
 KERNEL  := kernel.elf
 ISO     := os.iso
 
-OBJ := boot/boot.o kernel/kernel.o
+OBJ  := $(patsubst %.s,%.o,$(wildcard boot/*.s)) \
+        $(patsubst %.c,%.o,$(wildcard kernel/*.c))
+HDRS := $(wildcard include/*.h)
 
 .PHONY: all iso run test clean
 
@@ -23,7 +25,7 @@ $(KERNEL): $(OBJ) linker.ld
 %.o: %.s
 	$(AS) $(ASFLAGS) $< -o $@
 
-%.o: %.c
+%.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 iso: $(KERNEL)
