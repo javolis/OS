@@ -130,7 +130,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         sched_start();
         while (sched_user_tasks_alive())
             __asm__ volatile("hlt"); /* idle until everything exits */
-        sched_stop();
+        /* The scheduler stays on from here: the shell (this task) is the
+         * idle task, and its run command spawns programs live. */
         sched_reap();
         kprintf("[sched] %lu context switches; all user tasks finished\n",
                 sched_switch_count());

@@ -90,6 +90,9 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp) {
     *--sp = 0; /* ebp */
     t->kesp = (uint32_t)sp;
 
+    /* Publish last: a timer IRQ can run pick_next at any moment, and it
+     * must not see READY before the fields above are in place. */
+    __asm__ volatile("" : : : "memory");
     t->state = TASK_READY;
     return (int)t->pid;
 }

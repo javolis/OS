@@ -24,8 +24,12 @@ separately from C in user/, shipped as a GRUB Multiboot module), each
 into its own address space (own page directory, kernel half shared, both
 linked at 0x08048000), and the PIT round-robins between them — each task has its
 own kernel stack, the TSS esp0 follows the running task, and the boot
-flow doubles as the idle task. User code talks to the kernel via int
-0x80 (write / exit syscalls); teardown reclaims every frame.
+flow doubles as the idle task. The scheduler stays on after boot: the
+shell is the idle task and its `run <file>` command spawns initrd
+programs live (zombies are reaped at the prompt; kprintf is
+interrupt-atomic so output lines never interleave). User code talks to
+the kernel via int 0x80 (write / exit syscalls); teardown reclaims every
+frame.
 
 ## Prerequisites (Linux dev host)
 

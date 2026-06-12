@@ -5,10 +5,13 @@
 #include <stdint.h>
 
 #include "initrd.h"
+#include "io.h"
 #include "keyboard.h"
 #include "kheap.h"
 #include "kprintf.h"
 #include "pmm.h"
+#include "process.h"
+#include "sched.h"
 #include "serial.h"
 #include "shell.h"
 #include "term.h"
@@ -80,10 +83,12 @@ static void echo_char(char c) {
 }
 
 static void erase_chars(size_t count) {
+    uint32_t flags = irq_save(); /* don't interleave with task output */
     for (size_t i = 0; i < count; i++) {
         term_putchar('\b');    /* erases the cell on VGA */
         serial_write("\b \b"); /* erase on a serial terminal */
     }
+    irq_restore(flags);
 }
 
 /* Read one line with echo, backspace editing, and up/down history
@@ -141,6 +146,7 @@ void shell_run(void) {
 
     kprintf("Tiny shell ready. Type 'help'.\n");
     for (;;) {
+        sched_reap(); /* collect any tasks that exited since last prompt */
         kprintf("> ");
         readline(line, sizeof(line));
         history_add(line);
@@ -163,9 +169,21 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls\n");
+                    "history ls run\n");
         else if (streq(cmd, "ls"))
             initrd_list();
+        else if (streq(cmd, "run")) {
+            if (*rest == '\0') {
+                kprintf("usage: run <file> (see 'ls')\n");
+            } else {
+                uint32_t size;
+                const char *img = initrd_find(rest, &size);
+                if (!img)
+                    kprintf("run: %s: not found (try 'ls')\n", rest);
+                else if (process_spawn(img, img + size) < 0)
+                    kprintf("run: %s: spawn failed\n", rest);
+            }
+        }
         else if (streq(cmd, "echo"))
             kprintf("%s\n", rest);
         else if (streq(cmd, "clear"))

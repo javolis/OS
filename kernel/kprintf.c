@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "io.h"
 #include "kprintf.h"
 #include "serial.h"
 #include "term.h"
@@ -37,6 +38,10 @@ static void print_uint(uint32_t value, uint32_t base, int width, char pad) {
 }
 
 void kvprintf(const char *fmt, va_list ap) {
+    /* Whole-call atomicity: with the scheduler preempting between tasks,
+     * this keeps kernel and user output from interleaving mid-line. */
+    uint32_t flags = irq_save();
+
     for (size_t i = 0; fmt[i]; i++) {
         if (fmt[i] != '%') {
             putchar_both(fmt[i]);
@@ -101,13 +106,15 @@ void kvprintf(const char *fmt, va_list ap) {
             putchar_both('%');
             break;
         case '\0': /* string ended mid-specifier */
-            return;
+            goto out;
         default: /* unknown specifier: echo it verbatim */
             putchar_both('%');
             putchar_both(fmt[i]);
             break;
         }
     }
+out:
+    irq_restore(flags);
 }
 
 void kprintf(const char *fmt, ...) {

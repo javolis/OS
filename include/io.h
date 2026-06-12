@@ -22,6 +22,17 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
+/* Disable interrupts, returning the previous EFLAGS for irq_restore. */
+static inline uint32_t irq_save(void) {
+    uint32_t flags;
+    __asm__ volatile("pushf; pop %0; cli" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+static inline void irq_restore(uint32_t flags) {
+    __asm__ volatile("push %0; popf" : : "r"(flags) : "memory", "cc");
+}
+
 /* Ask QEMU's isa-debug-exit device to power off. Harmless on real hardware
  * (the port write is simply ignored when the device is absent). */
 static inline void qemu_exit(uint8_t code) {
