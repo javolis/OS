@@ -82,6 +82,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc s t d i o t e s t dot e l f ret \
                r u n spc b i g b i n dot e l f ret \
                r u n spc t e m p l a t e dot e l f ret \
+               r u n spc a p p t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -442,6 +443,16 @@ if grep -q "sbrktest: heap grows ok" "$SERIAL_LOG"; then
     echo "PASS: SYS_SBRK grows a per-process heap"
 else
     echo "FAIL: SYS_SBRK misbehaved" >&2
+    fail=1
+fi
+
+# App-readiness capstone: one program exercising heap (many + large
+# allocs), strings, and the stdio file reader together. PLATFORM READY
+# prints only if every check passed.
+if grep -q "apptest: PLATFORM READY" "$SERIAL_LOG"; then
+    echo "PASS: userland platform ready for real apps"
+else
+    echo "FAIL: app-readiness capstone had failures" >&2
     fail=1
 fi
 
