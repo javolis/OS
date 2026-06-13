@@ -19,6 +19,11 @@ void fb_fill(uint32_t rgb);
 void fb_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
                  uint32_t rgb);
 
+/* Render an 8x8 glyph at pixel (px,py) with foreground/background colors. */
+void fb_draw_glyph(uint32_t px, uint32_t py, char c, uint32_t fg,
+                   uint32_t bg);
+void fb_scroll(uint32_t lines, uint32_t bg);
+
 /* Cheap additive checksum of a pixel region - lets CI confirm (over
  * serial) that drawing actually changed the framebuffer. */
 uint32_t fb_checksum(uint32_t x, uint32_t y, uint32_t w, uint32_t h);

@@ -6,6 +6,10 @@ A hobby operating system / kernel, built from scratch.
 
 ## Status
 
+Displays on a linear framebuffer (with an 8x8 font console) when the
+bootloader provides one — so it shows on modern UEFI VMs too — and falls
+back to legacy VGA text otherwise; serial mirrors everything.
+
 Early bootstrap. A freestanding i686 higher-half kernel (linked at
 0xC0100000, loaded at 1 MiB) that boots via the Multiboot protocol (GRUB),
 installs its own GDT and IDT (with handlers for all 32 CPU exceptions),
