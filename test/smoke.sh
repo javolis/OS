@@ -50,7 +50,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r u n n e r dot e l f ret \
                r u n spc u s h dot e l f ret \
                e c h o dot e l f spc h i spc f r o m spc u s h ret \
-               c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc u p p e r dot e l f ret \
+               c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc u p p e r dot e l f spc shift-backslash spc u p p e r dot e l f ret \
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
@@ -279,10 +279,11 @@ else
     fail=1
 fi
 
-# Pipeline inside ush: 'cat.elf notes.txt | upper.elf' uppercases the
-# file's content, so the shouted form of a unique line must appear.
+# Three-stage pipeline inside ush: 'cat notes.txt | upper | upper'.
+# Uppercasing is idempotent, so correct output through all three stages
+# still yields the shouted line; a broken middle stage drops it or hangs.
 if grep -q "NEXT STOP: PIPES." "$SERIAL_LOG"; then
-    echo "PASS: ush pipeline ran (cat | upper)"
+    echo "PASS: ush multi-stage pipeline ran (cat | upper | upper)"
 else
     echo "FAIL: pipeline produced no uppercased output" >&2
     fail=1
