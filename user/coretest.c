@@ -55,6 +55,46 @@ void _start(void) {
     check("nl.elf", "x\ny\nz\n", "1\tx\n2\ty\n3\tz\n", "nl");
     check("rev.elf", "abc\nxy\n", "cba\nyx\n", "rev");
 
+    /* yes: produces an endless stream; we read a few bytes, close the
+     * read end, and it should exit on the broken pipe. */
+    {
+        int p[2];
+        sys_pipe(p);
+        int pid = sys_spawn_io("yes.elf y", -1, p[1]);
+        sys_close(p[1]);
+        char b[8];
+        int got = 0, r;
+        while (got < 4 && (r = sys_read(p[0], b + got, 4 - got)) > 0)
+            got += r;
+        b[got] = '\0';
+        sys_close(p[0]); /* triggers yes's broken-pipe exit */
+        sys_wait(pid);
+        if (ustreq(b, "y\ny\n")) {
+            passed++;
+        } else {
+            failed++;
+            uprintf("  FAIL: yes\n");
+        }
+    }
+
+    /* true / false: exit codes. */
+    {
+        int pid = sys_spawn("true.elf");
+        if (sys_wait(pid) == 0)
+            passed++;
+        else {
+            failed++;
+            uprintf("  FAIL: true\n");
+        }
+        pid = sys_spawn("false.elf");
+        if (sys_wait(pid) == 1)
+            passed++;
+        else {
+            failed++;
+            uprintf("  FAIL: false\n");
+        }
+    }
+
     /* tee: passthrough on stdout AND a copy left in the named file. */
     {
         int ok = run_filter("tee.elf teefile", "hi\nthere\n", "hi\nthere\n");
