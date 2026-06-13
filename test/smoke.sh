@@ -75,6 +75,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r u n t e s t s dot e l f ret \
                r u n spc d e v t e s t dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
+               r u n spc u l i b t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -426,6 +427,14 @@ if [ "$zqx_count" -ge 2 ]; then
     echo "PASS: readline history recalled a command (zqx x${zqx_count})"
 else
     echo "FAIL: history recall did not re-run the command (x${zqx_count})" >&2
+    fail=1
+fi
+
+# ulib mem/string suite: ulibtest exercises memset/cpy/move/strcmp/etc.
+if grep -q "ulibtest: all ok" "$SERIAL_LOG"; then
+    echo "PASS: ulib mem/string suite"
+else
+    echo "FAIL: ulib mem/string suite" >&2
     fail=1
 fi
 
