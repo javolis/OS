@@ -70,6 +70,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
+               r u n spc r u n t e s t s dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -390,6 +391,16 @@ if grep -q "script-ran-ok" "$SERIAL_LOG"; then
     echo "PASS: ush executed a script file"
 else
     echo "FAIL: ush did not run the script" >&2
+    fail=1
+fi
+
+# Capstone: one program exercises the whole syscall surface (process,
+# file, ramfs, pipe, time, kill) and tallies results. ALL PASS only
+# prints if every sub-test succeeded.
+if grep -qE "runtests: ALL PASS \([0-9]+ tests\)" "$SERIAL_LOG"; then
+    echo "PASS: capstone self-test all green"
+else
+    echo "FAIL: capstone self-test had failures" >&2
     fail=1
 fi
 
