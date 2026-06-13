@@ -5,7 +5,7 @@
  *
  * Available to you:
  *   - syscalls in usys.h  (sys_read/sys_writefd/sys_open/sys_spawn/...)
- *   - ulib.h: uprintf, umalloc/ufree, ustr*/umem* helpers,
+ *   - ulib.h: uprintf, umalloc/ufree, the ustr and umem helpers,
  *             uputs/ugetline, and the ufopen/ufgets file reader.
  *
  * Your program gets argc/argv, a 16 KiB stack, an on-demand heap, and
