@@ -57,13 +57,14 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c a t dot e l f spc n o t e s dot t x t ret \
                r u n spc c l o c k dot e l f ret \
                ctrl-c \
-               e c h o spc i n t a c t ret; do
+               e c h o spc i n t a c t ret \
+               r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
     done
-    sleep 4
+    sleep 8
     echo "quit"
-} | timeout 120 qemu-system-i386 \
+} | timeout 150 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
@@ -283,6 +284,15 @@ if grep -q "NEXT STOP: PIPES." "$SERIAL_LOG"; then
     echo "PASS: ush pipeline ran (cat | upper)"
 else
     echo "FAIL: pipeline produced no uppercased output" >&2
+    fail=1
+fi
+
+# Stress test: many spawn/wait + pipe cycles, self-checking that every
+# frame came back. A leak (or a teardown crash) fails this.
+if grep -q "spawnstorm: no leak" "$SERIAL_LOG"; then
+    echo "PASS: spawnstorm completed with no frame leak"
+else
+    echo "FAIL: spawnstorm reported a leak or did not finish" >&2
     fail=1
 fi
 
