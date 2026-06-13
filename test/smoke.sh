@@ -135,17 +135,17 @@ else
     fail=1
 fi
 
-# Framebuffer: GRUB should provide a linear 32bpp surface (QEMU's VGA
-# supports it). The test pattern's non-zero checksum proves we mapped the
-# framebuffer and wrote pixels to it. (A text-only setup logs 'none' and
-# falls back to VGA, which is also acceptable - so accept either, but the
-# white box must not checksum to zero when a framebuffer is present.)
-if grep -qE "framebuffer: [0-9]+x[0-9]+ 32bpp; checksum [0-9a-f]+" "$SERIAL_LOG"; then
-    if grep -qE "checksum 00000000$" "$SERIAL_LOG"; then
-        echo "FAIL: framebuffer present but test pattern checksum is zero" >&2
+# Framebuffer console: GRUB should provide a linear 32bpp surface (QEMU's
+# VGA supports it); the kernel switches the console to it and renders the
+# banner with the 8x8 font. A non-zero checksum over the banner region
+# proves glyphs were drawn. A text-only setup logs 'none' (VGA fallback),
+# which is also acceptable.
+if grep -q "framebuffer console:" "$SERIAL_LOG"; then
+    if grep -qE "fbcon checksum 00000000$" "$SERIAL_LOG"; then
+        echo "FAIL: framebuffer console drew nothing (zero checksum)" >&2
         fail=1
     else
-        echo "PASS: framebuffer mapped and drawn (non-zero checksum)"
+        echo "PASS: framebuffer console renders glyphs (non-zero checksum)"
     fi
 elif grep -q "framebuffer: none" "$SERIAL_LOG"; then
     echo "PASS: no framebuffer; VGA text fallback (acceptable)"

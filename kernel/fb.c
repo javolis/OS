@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "fb.h"
+#include "font8x8.h"
 #include "memlayout.h"
 #include "multiboot.h"
 #include "paging.h"
@@ -81,6 +82,34 @@ void fb_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h,
 
 void fb_fill(uint32_t rgb) {
     fb_fillrect(0, 0, fb_w, fb_h, rgb);
+}
+
+void fb_draw_glyph(uint32_t px, uint32_t py, char c, uint32_t fg,
+                   uint32_t bg) {
+    if (!fb)
+        return;
+    unsigned char uc = (unsigned char)c;
+    if (uc < FONT_FIRST || uc > FONT_LAST)
+        uc = ' ';
+    const uint8_t *g = font8x8[uc - FONT_FIRST];
+    for (int row = 0; row < FONT_H; row++) {
+        uint8_t bits = g[row];
+        for (int col = 0; col < FONT_W; col++)
+            fb_putpixel(px + col, py + row, (bits & (0x80 >> col)) ? fg : bg);
+    }
+}
+
+/* Shift the whole framebuffer up by `lines` pixels; fill the exposed
+ * bottom band with bg. */
+void fb_scroll(uint32_t lines, uint32_t bg) {
+    if (!fb || lines == 0 || lines >= fb_h)
+        return;
+    uint32_t keep = (fb_h - lines) * fb_p;
+    uint8_t *dst = fb;
+    const uint8_t *src = fb + lines * fb_p;
+    for (uint32_t i = 0; i < keep; i++)
+        dst[i] = src[i];
+    fb_fillrect(0, fb_h - lines, fb_w, lines, bg);
 }
 
 uint32_t fb_checksum(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {

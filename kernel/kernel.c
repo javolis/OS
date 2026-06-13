@@ -85,19 +85,16 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         halt_forever();
     }
 
-    /* Framebuffer: if the bootloader gave us a linear 32bpp surface, map
-     * it and paint a recognizable test pattern (dark-blue field + a white
-     * box). Visible proof the video path works on real firmware; CI can't
-     * see pixels, so we also log geometry + a checksum over serial. The
-     * full framebuffer text console comes next. */
+    /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
+     * the console to it so the shell renders graphically (and on UEFI VMs
+     * that lack VGA text). Early boot lines above this point went to VGA
+     * text + serial; from here output is drawn with the 8x8 font. CI can't
+     * see pixels, so log geometry + a checksum over the rendered banner. */
     if (fb_init(mbi)) {
-        fb_fill(0x00000033); /* dark blue */
-        fb_fillrect(fb_width() / 2 - 100, fb_height() / 2 - 60, 200, 120,
-                    0x00FFFFFF); /* centered white box */
-        kprintf("framebuffer: %lux%lu 32bpp; checksum %08lx\n", fb_width(),
-                fb_height(),
-                fb_checksum(fb_width() / 2 - 100, fb_height() / 2 - 60, 200,
-                            120));
+        term_use_framebuffer();
+        kprintf("framebuffer console: %lux%lu 32bpp\n", fb_width(),
+                fb_height());
+        kprintf("fbcon checksum %08lx\n", fb_checksum(0, 0, 240, 8));
     } else {
         kprintf("framebuffer: none (using VGA text console)\n");
     }
