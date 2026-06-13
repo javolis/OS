@@ -79,6 +79,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc s b r k t e s t dot e l f ret \
                r u n spc m a l l o c t e s t dot e l f ret \
                r u n spc s t a c k t e s t dot e l f ret \
+               r u n spc s t d i o t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -439,6 +440,16 @@ if grep -q "sbrktest: heap grows ok" "$SERIAL_LOG"; then
     echo "PASS: SYS_SBRK grows a per-process heap"
 else
     echo "FAIL: SYS_SBRK misbehaved" >&2
+    fail=1
+fi
+
+# stdio: the buffered ufile reader returns words.txt's first line "pear"
+# (this exact string appears in no other output, since the file is only
+# otherwise reversed by tools.ush).
+if grep -q "stdiotest: first=pear" "$SERIAL_LOG"; then
+    echo "PASS: ulib stdio file reader"
+else
+    echo "FAIL: stdio file reader" >&2
     fail=1
 fi
 

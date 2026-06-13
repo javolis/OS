@@ -190,6 +190,73 @@ void ufree(void *ptr) {
         }
 }
 
+/* --- stdio-lite --- */
+void uputc(char c) {
+    sys_writefd(1, &c, 1);
+}
+
+void uputs(const char *s) {
+    sys_writefd(1, s, (int)ustrlen(s));
+    sys_writefd(1, "\n", 1);
+}
+
+int ugetline(char *buf, int n) {
+    return sys_read(0, buf, n); /* fd 0 returns one edited line */
+}
+
+struct ufile {
+    int fd;
+    int pos;
+    int len;
+    char buf[256];
+};
+
+struct ufile *ufopen(const char *name) {
+    int fd = sys_open(name);
+    if (fd < 0)
+        return 0;
+    struct ufile *f = umalloc(sizeof(struct ufile));
+    if (!f) {
+        sys_close(fd);
+        return 0;
+    }
+    f->fd = fd;
+    f->pos = 0;
+    f->len = 0;
+    return f;
+}
+
+int ufgetc(struct ufile *f) {
+    if (f->pos >= f->len) {
+        f->len = sys_read(f->fd, f->buf, (int)sizeof(f->buf));
+        f->pos = 0;
+        if (f->len <= 0)
+            return -1; /* EOF or error */
+    }
+    return (unsigned char)f->buf[f->pos++];
+}
+
+char *ufgets(char *s, int n, struct ufile *f) {
+    int i = 0;
+    int c;
+    while (i < n - 1 && (c = ufgetc(f)) >= 0) {
+        s[i++] = (char)c;
+        if (c == '\n')
+            break;
+    }
+    if (i == 0)
+        return 0; /* nothing read: EOF */
+    s[i] = '\0';
+    return s;
+}
+
+void ufclose(struct ufile *f) {
+    if (!f)
+        return;
+    sys_close(f->fd);
+    ufree(f);
+}
+
 static char *emit_uint(char *p, const char *end, uint32_t v, uint32_t base) {
     char tmp[12];
     int n = 0;
