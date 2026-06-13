@@ -112,6 +112,84 @@ int uatoi(const char *s) {
     return sign * v;
 }
 
+/* --- heap allocator: first-fit free list over sys_sbrk --- */
+struct ublock {
+    uint32_t size; /* payload bytes, excluding this header */
+    uint32_t free;
+    struct ublock *next; /* next block by address */
+};
+
+#define UHDR ((uint32_t)sizeof(struct ublock))
+#define UMIN_SPLIT (UHDR + 8)
+
+static struct ublock *uheap;
+
+/* Grow the heap by at least min_bytes (page-rounded) via sbrk, appending a
+ * free block. sbrk hands back contiguous regions, so the new block abuts
+ * the old tail and the list stays address-ordered and gap-free. */
+static int ugrow(uint32_t min_bytes) {
+    uint32_t bytes = (min_bytes + 4095u) & ~4095u;
+    void *p = sys_sbrk((int)bytes);
+    if (p == (void *)-1)
+        return 0;
+    struct ublock *nb = (struct ublock *)p;
+    nb->size = bytes - UHDR;
+    nb->free = 1;
+    nb->next = 0;
+    if (!uheap) {
+        uheap = nb;
+        return 1;
+    }
+    struct ublock *t = uheap;
+    while (t->next)
+        t = t->next;
+    t->next = nb;
+    if (t->free) { /* adjacent by construction: merge */
+        t->size += UHDR + nb->size;
+        t->next = 0;
+    }
+    return 1;
+}
+
+void *umalloc(uint32_t size) {
+    if (size == 0)
+        return 0;
+    size = (size + 3u) & ~3u; /* 4-byte aligned payloads */
+
+    for (;;) {
+        for (struct ublock *b = uheap; b; b = b->next) {
+            if (!b->free || b->size < size)
+                continue;
+            if (b->size >= size + UMIN_SPLIT) {
+                struct ublock *nb =
+                    (struct ublock *)((uint8_t *)b + UHDR + size);
+                nb->size = b->size - size - UHDR;
+                nb->free = 1;
+                nb->next = b->next;
+                b->size = size;
+                b->next = nb;
+            }
+            b->free = 0;
+            return (uint8_t *)b + UHDR;
+        }
+        if (!ugrow(size + UHDR))
+            return 0;
+    }
+}
+
+void ufree(void *ptr) {
+    if (!ptr)
+        return;
+    struct ublock *b = (struct ublock *)((uint8_t *)ptr - UHDR);
+    b->free = 1;
+    /* address-ordered, gap-free: merge every run of free neighbours. */
+    for (struct ublock *cur = uheap; cur; cur = cur->next)
+        while (cur->free && cur->next && cur->next->free) {
+            cur->size += UHDR + cur->next->size;
+            cur->next = cur->next->next;
+        }
+}
+
 static char *emit_uint(char *p, const char *end, uint32_t v, uint32_t base) {
     char tmp[12];
     int n = 0;

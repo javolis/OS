@@ -26,7 +26,8 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/runtests.elf user/devtest.elf user/grep.elf \
              user/coretest.elf user/sort.elf user/uniq.elf user/tee.elf \
              user/nl.elf user/rev.elf user/yes.elf user/true.elf \
-             user/false.elf user/ulibtest.elf user/sbrktest.elf
+             user/false.elf user/ulibtest.elf user/sbrktest.elf \
+             user/malloctest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar
