@@ -1,0 +1,3 @@
+# demo.ush - a ush script: comments, a variable, and a command.
+set tag=ok
+echo.elf script-ran-$tag

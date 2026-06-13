@@ -69,6 +69,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a p p e n d t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
+               r u n spc u s h dot e l f spc d e m o dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -378,6 +379,17 @@ if grep -qE "135 r notes.txt" "$SERIAL_LOG"; then
     echo "PASS: ls listed a file with its size via readdir"
 else
     echo "FAIL: ls did not report notes.txt size" >&2
+    fail=1
+fi
+
+# Shell scripts: 'ush demo.ush' runs a script that sets tag=ok and runs
+# 'echo.elf script-ran-$tag'. The expanded 'script-ran-ok' is in no typed
+# command and the script file is never cat'd, so it proves the script
+# was read, a variable set, expanded, and a command spawned.
+if grep -q "script-ran-ok" "$SERIAL_LOG"; then
+    echo "PASS: ush executed a script file"
+else
+    echo "FAIL: ush did not run the script" >&2
     fail=1
 fi
 
