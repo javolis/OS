@@ -13,3 +13,6 @@ const void *initrd_find(const char *name, uint32_t *size_out);
 
 /* Print a directory listing via kprintf (used by the shell's ls). */
 void initrd_list(void);
+
+/* Enumerate regular files by index: fills name/size, returns 1 or 0. */
+int initrd_entry(uint32_t idx, const char **name_out, uint32_t *size_out);

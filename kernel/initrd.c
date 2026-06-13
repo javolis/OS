@@ -113,3 +113,28 @@ void initrd_list(void) {
         off += TAR_BLOCK + ((fsize + TAR_BLOCK - 1) & ~(TAR_BLOCK - 1));
     }
 }
+
+/* Fill *name_out/*size_out for the idx-th regular file (0-based). Returns
+ * 1 if present, 0 if idx is past the end. */
+int initrd_entry(uint32_t idx, const char **name_out, uint32_t *size_out) {
+    if (!initrd_base)
+        return 0;
+    uint32_t off = 0, i = 0;
+    while (off + TAR_BLOCK <= initrd_size) {
+        const struct tar_header *h =
+            (const struct tar_header *)(initrd_base + off);
+        if (h->name[0] == '\0')
+            break;
+        uint32_t fsize = parse_octal(h->size, sizeof(h->size));
+        if (is_regular_file(h)) {
+            if (i == idx) {
+                *name_out = h->name;
+                *size_out = fsize;
+                return 1;
+            }
+            i++;
+        }
+        off += TAR_BLOCK + ((fsize + TAR_BLOCK - 1) & ~(TAR_BLOCK - 1));
+    }
+    return 0;
+}

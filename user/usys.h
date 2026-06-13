@@ -107,6 +107,23 @@ static inline int sys_kill(int pid) {
     return ret;
 }
 
+/* Keep in sync with the kernel's struct dirent in include/syscall.h. */
+struct dirent {
+    char name[32];
+    unsigned int size;
+    unsigned int kind; /* 0 = initrd (read-only), 1 = ramfs */
+};
+
+/* Enumerate files by index (initrd then ramfs). 0 on success, -1 at end. */
+static inline int sys_readdir(int index, struct dirent *out) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(19), "b"(index), "c"(out)
+                     : "memory");
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

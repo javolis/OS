@@ -38,7 +38,8 @@ spawn / wait / sysinfo / open / read / writefd / close / pipe / spawn_io
 codes via wait (which also reclaims the child), stream initrd files
 through per-process file descriptors (cat.elf), connect through pipes,
 read/write a small in-RAM filesystem (ramfs, alongside the read-only
-initrd), and read the wall clock from the CMOS RTC (date.elf); ush.elf is a
+initrd) and list it with sizes (ls.elf via readdir), and read the wall
+clock from the CMOS RTC (date.elf); ush.elf is a
 complete shell running in ring 3 with multi-stage `a | b | c` pipelines and
 `>` / `>>` / `<` file redirection, `rm` and `set NAME=VAL` builtins with
 `$VAR` expansion, and a tiny user libc providing uprintf); sleep blocks

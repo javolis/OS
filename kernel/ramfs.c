@@ -113,3 +113,20 @@ void ramfs_list(void) {
         if (files[i].used)
             kprintf("%8lu  %s\n", files[i].size, files[i].name);
 }
+
+/* Fill *name_out/*size_out for the idx-th used file (0-based). Returns 1
+ * if present, 0 if idx is past the last used entry. */
+int ramfs_entry(uint32_t idx, const char **name_out, uint32_t *size_out) {
+    uint32_t i = 0;
+    for (int s = 0; s < RAMFS_MAX_FILES; s++) {
+        if (!files[s].used)
+            continue;
+        if (i == idx) {
+            *name_out = files[s].name;
+            *size_out = files[s].size;
+            return 1;
+        }
+        i++;
+    }
+    return 0;
+}
