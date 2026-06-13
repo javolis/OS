@@ -57,6 +57,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc h e a d dot e l f spc minus 1 spc shift-backslash spc w c dot e l f ret \
                s e t spc x equal w o r k e d ret \
                e c h o dot e l f spc v a r minus shift-4 x ret \
+               e c h o dot e l f spc z q x ret \
+               up ret \
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
@@ -412,6 +414,17 @@ if grep -q "devtest: dev files ok" "$SERIAL_LOG"; then
     echo "PASS: /dev/null and /dev/zero behave"
 else
     echo "FAIL: device files misbehaved" >&2
+    fail=1
+fi
+
+# ush readline history: 'echo.elf zqx' then Up + Enter re-runs it, so the
+# bare 'zqx' output line must appear at least twice (the typed/recalled
+# command lines carry the 'ush$ ' prefix, so only echo's output matches).
+zqx_count=$(grep -c "^zqx$" "$SERIAL_LOG")
+if [ "$zqx_count" -ge 2 ]; then
+    echo "PASS: readline history recalled a command (zqx x${zqx_count})"
+else
+    echo "FAIL: history recall did not re-run the command (x${zqx_count})" >&2
     fail=1
 fi
 
