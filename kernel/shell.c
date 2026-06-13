@@ -11,6 +11,7 @@
 #include "kprintf.h"
 #include "pmm.h"
 #include "process.h"
+#include "rtc.h"
 #include "sched.h"
 #include "serial.h"
 #include "shell.h"
@@ -169,11 +170,18 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls run ps kill\n");
+                    "history ls run ps kill date\n");
         else if (streq(cmd, "ps"))
             sched_ps();
         else if (streq(cmd, "ls"))
             initrd_list();
+        else if (streq(cmd, "date")) {
+            struct rtc_time t;
+            rtc_read(&t);
+            kprintf("%lu-%lu-%lu %lu:%lu:%lu\n", (uint32_t)t.year,
+                    (uint32_t)t.month, (uint32_t)t.day, (uint32_t)t.hour,
+                    (uint32_t)t.minute, (uint32_t)t.second);
+        }
         else if (streq(cmd, "run")) {
             if (*rest == '\0') {
                 kprintf("usage: run <file> [args...] [&] (see 'ls')\n");
