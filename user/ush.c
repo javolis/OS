@@ -184,10 +184,221 @@ static void run_pipeline(char *cmds[], int n) {
             sys_wait(pids[i]);
 }
 
-void _start(void) {
-    char raw[128];
+/* Process one command line (mutated in place). Used for both interactive
+ * input and script lines; 'continue' became 'return'. */
+static void run_line(char *raw) {
     char line[256];
 
+    if (streq(raw, "exit")) {
+        sys_write("ush: bye\n");
+        sys_exit(0);
+    }
+    if (streq(raw, "help")) {
+        sys_write("ush builtins: help, exit, rm <file>, set NAME=VAL, "
+                  "kill <pid>\n"
+                  "run: <file.elf> [args...] [&]\n"
+                  "pipelines: <a> | <b> | <c> ...\n"
+                  "redirection: <cmd> > out, >> out (append), < in\n"
+                  "variables: set X=val then $X\n");
+        return;
+    }
+    /* 'set NAME=VALUE' stores a variable (value taken raw). */
+    if (raw[0] == 's' && raw[1] == 'e' && raw[2] == 't' && raw[3] == ' ') {
+        char *a = trim(raw + 4);
+        int e = 0;
+        while (a[e] && a[e] != '=')
+            e++;
+        if (a[e] != '=' || e == 0) {
+            sys_write("ush: usage: set NAME=VALUE\n");
+        } else {
+            a[e] = '\0';
+            var_set(a, a + e + 1);
+        }
+        return;
+    }
+
+    /* Expand $VARs into the working buffer used by everything below. */
+    expand_vars(raw, line, sizeof(line));
+    int n = 0;
+    while (line[n])
+        n++;
+
+    if (line[0] == 'r' && line[1] == 'm' && line[2] == ' ') {
+        char *f = trim(line + 3);
+        if (*f == '\0')
+            sys_write("ush: rm needs a filename\n");
+        else if (sys_unlink(f) != 0)
+            sys_write("ush: rm: no such file\n");
+        return;
+    }
+    if (line[0] == 'k' && line[1] == 'i' && line[2] == 'l' &&
+        line[3] == 'l' && line[4] == ' ') {
+        char *a = trim(line + 5);
+        int pid = 0, ok = (*a != '\0');
+        for (int i = 0; a[i]; i++) {
+            if (a[i] < '0' || a[i] > '9') {
+                ok = 0;
+                break;
+            }
+            pid = pid * 10 + (a[i] - '0');
+        }
+        if (!ok)
+            sys_write("ush: usage: kill <pid>\n");
+        else if (sys_kill(pid) != 0)
+            sys_write("ush: kill: no such task\n");
+        return;
+    }
+
+    /* Split on '|' into pipeline stages. */
+    char *cmds[MAX_STAGES];
+    int nstage = 0;
+    int ok = 1;
+    int start = 0;
+    for (int i = 0; i <= n; i++) {
+        if (i == n || line[i] == '|') {
+            line[i] = '\0';
+            if (nstage >= MAX_STAGES) {
+                ok = 0;
+                break;
+            }
+            cmds[nstage] = trim(line + start);
+            if (*cmds[nstage] == '\0') {
+                ok = 0; /* empty stage, e.g. 'a |' or 'a || b' */
+                break;
+            }
+            nstage++;
+            start = i + 1;
+        }
+    }
+    if (!ok) {
+        sys_write("ush: malformed pipeline\n");
+        return;
+    }
+    if (nstage > 1) {
+        run_pipeline(cmds, nstage);
+        return;
+    }
+    /* Single stage: continue with the trimmed command. */
+    {
+        char *c = cmds[0];
+        int j = 0;
+        while (c[j]) {
+            line[j] = c[j];
+            j++;
+        }
+        line[j] = '\0';
+        n = j;
+    }
+
+    /* Trailing '&' runs the program in the background. */
+    int bg = 0;
+    int end = n;
+    while (end > 0 && line[end - 1] == ' ')
+        end--;
+    if (end > 0 && line[end - 1] == '&') {
+        bg = 1;
+        end--;
+        while (end > 0 && line[end - 1] == ' ')
+            end--;
+    }
+    line[end] = '\0';
+    if (end == 0)
+        return;
+
+    /* Redirection: '> out', '>> out' (append), and '< in'. */
+    char *infile, *outfile;
+    int append;
+    if (parse_redir(line, &infile, &outfile, &append) != 0) {
+        sys_write("ush: redirection needs a filename\n");
+        return;
+    }
+    char *cmd0 = trim(line);
+    if (*cmd0 == '\0')
+        return;
+
+    if (infile || outfile) {
+        int infd = -1, outfd = -1;
+        if (infile) {
+            infd = sys_open(trim(infile));
+            if (infd < 0) {
+                sys_write("ush: cannot open input file\n");
+                return;
+            }
+        }
+        if (outfile) {
+            char *o = trim(outfile);
+            outfd = append ? sys_append(o) : sys_create(o);
+            if (outfd < 0) {
+                sys_write("ush: cannot create output file\n");
+                if (infd >= 0)
+                    sys_close(infd);
+                return;
+            }
+        }
+        int pid = sys_spawn_io(cmd0, infd, outfd);
+        if (infd >= 0)
+            sys_close(infd);
+        if (outfd >= 0)
+            sys_close(outfd);
+        if (pid < 0)
+            sys_write("ush: cannot run redirected command\n");
+        else if (!bg)
+            sys_wait(pid);
+        return;
+    }
+
+    int pid = bg ? sys_spawn(cmd0) : sys_spawn_fg(cmd0);
+    if (pid < 0) {
+        sys_write("ush: cannot run: ");
+        sys_write(cmd0);
+        sys_write("\n");
+        return;
+    }
+    if (!bg)
+        sys_wait(pid); /* keyboard returns to us when the child dies */
+}
+
+/* Read a script file and run each non-empty, non-'#' line. */
+static void run_script(const char *name) {
+    int fd = sys_open(name);
+    if (fd < 0) {
+        sys_write("ush: cannot open script\n");
+        return;
+    }
+    static char buf[2048];
+    int total = 0, n;
+    while (total < (int)sizeof(buf) - 1 &&
+           (n = sys_read(fd, buf + total, (int)sizeof(buf) - 1 - total)) > 0)
+        total += n;
+    sys_close(fd);
+    buf[total] = '\0';
+
+    char raw[128];
+    int i = 0;
+    while (i < total) {
+        int j = 0;
+        while (i < total && buf[i] != '\n') {
+            if (j < (int)sizeof(raw) - 1)
+                raw[j++] = buf[i];
+            i++;
+        }
+        raw[j] = '\0';
+        if (i < total) /* skip the newline */
+            i++;
+        char *t = trim(raw);
+        if (*t != '\0' && t[0] != '#')
+            run_line(t);
+    }
+}
+
+void _start(int argc, char **argv) {
+    /* 'ush <script>' runs a script file and exits; otherwise interactive. */
+    if (argc >= 2) {
+        run_script(argv[1]);
+        sys_exit(0);
+    }
+
+    char raw[128];
     sys_write("ush: user-mode shell (type 'help')\n");
     for (;;) {
         sys_write("ush$ ");
@@ -196,176 +407,7 @@ void _start(void) {
             sys_write("ush: lost the keyboard, exiting\n");
             sys_exit(0);
         }
-        if (rn == 0)
-            continue;
-
-        if (streq(raw, "exit")) {
-            sys_write("ush: bye\n");
-            sys_exit(0);
-        }
-        if (streq(raw, "help")) {
-            sys_write("ush builtins: help, exit, rm <file>, set NAME=VAL, "
-                      "kill <pid>\n"
-                      "run: <file.elf> [args...] [&]\n"
-                      "pipelines: <a> | <b> | <c> ...\n"
-                      "redirection: <cmd> > out, >> out (append), < in\n"
-                      "variables: set X=val then $X\n");
-            continue;
-        }
-        /* 'set NAME=VALUE' stores a variable (value taken raw). */
-        if (raw[0] == 's' && raw[1] == 'e' && raw[2] == 't' &&
-            raw[3] == ' ') {
-            char *a = trim(raw + 4);
-            int e = 0;
-            while (a[e] && a[e] != '=')
-                e++;
-            if (a[e] != '=' || e == 0) {
-                sys_write("ush: usage: set NAME=VALUE\n");
-            } else {
-                a[e] = '\0';
-                var_set(a, a + e + 1);
-            }
-            continue;
-        }
-
-        /* Expand $VARs into the working buffer used by everything below. */
-        expand_vars(raw, line, sizeof(line));
-        int n = 0;
-        while (line[n])
-            n++;
-
-        if (line[0] == 'r' && line[1] == 'm' && line[2] == ' ') {
-            char *f = trim(line + 3);
-            if (*f == '\0')
-                sys_write("ush: rm needs a filename\n");
-            else if (sys_unlink(f) != 0)
-                sys_write("ush: rm: no such file\n");
-            continue;
-        }
-        if (line[0] == 'k' && line[1] == 'i' && line[2] == 'l' &&
-            line[3] == 'l' && line[4] == ' ') {
-            char *a = trim(line + 5);
-            int pid = 0, ok = (*a != '\0');
-            for (int i = 0; a[i]; i++) {
-                if (a[i] < '0' || a[i] > '9') {
-                    ok = 0;
-                    break;
-                }
-                pid = pid * 10 + (a[i] - '0');
-            }
-            if (!ok)
-                sys_write("ush: usage: kill <pid>\n");
-            else if (sys_kill(pid) != 0)
-                sys_write("ush: kill: no such task\n");
-            continue;
-        }
-
-        /* Split on '|' into pipeline stages. */
-        char *cmds[MAX_STAGES];
-        int nstage = 0;
-        int ok = 1;
-        int start = 0;
-        for (int i = 0; i <= n; i++) {
-            if (i == n || line[i] == '|') {
-                line[i] = '\0';
-                if (nstage >= MAX_STAGES) {
-                    ok = 0;
-                    break;
-                }
-                cmds[nstage] = trim(line + start);
-                if (*cmds[nstage] == '\0') {
-                    ok = 0; /* empty stage, e.g. 'a |' or 'a || b' */
-                    break;
-                }
-                nstage++;
-                start = i + 1;
-            }
-        }
-        if (!ok) {
-            sys_write("ush: malformed pipeline\n");
-            continue;
-        }
-        if (nstage > 1) {
-            run_pipeline(cmds, nstage);
-            continue;
-        }
-        /* Single stage: fall through with the trimmed command. */
-        {
-            char *c = cmds[0];
-            int j = 0;
-            while (c[j]) {
-                line[j] = c[j];
-                j++;
-            }
-            line[j] = '\0';
-            n = j;
-        }
-
-        /* Trailing '&' runs the program in the background. */
-        int bg = 0;
-        int end = n;
-        while (end > 0 && line[end - 1] == ' ')
-            end--;
-        if (end > 0 && line[end - 1] == '&') {
-            bg = 1;
-            end--;
-            while (end > 0 && line[end - 1] == ' ')
-                end--;
-        }
-        line[end] = '\0';
-        if (end == 0)
-            continue;
-
-        /* Redirection: '> out', '>> out' (append), and '< in'. */
-        char *infile, *outfile;
-        int append;
-        if (parse_redir(line, &infile, &outfile, &append) != 0) {
-            sys_write("ush: redirection needs a filename\n");
-            continue;
-        }
-        char *cmd0 = trim(line);
-        if (*cmd0 == '\0')
-            continue;
-
-        if (infile || outfile) {
-            int infd = -1, outfd = -1;
-            if (infile) {
-                infd = sys_open(trim(infile));
-                if (infd < 0) {
-                    sys_write("ush: cannot open input file\n");
-                    continue;
-                }
-            }
-            if (outfile) {
-                char *o = trim(outfile);
-                outfd = append ? sys_append(o) : sys_create(o);
-                if (outfd < 0) {
-                    sys_write("ush: cannot create output file\n");
-                    if (infd >= 0)
-                        sys_close(infd);
-                    continue;
-                }
-            }
-            int pid = sys_spawn_io(cmd0, infd, outfd);
-            if (infd >= 0)
-                sys_close(infd);
-            if (outfd >= 0)
-                sys_close(outfd);
-            if (pid < 0)
-                sys_write("ush: cannot run redirected command\n");
-            else if (!bg)
-                sys_wait(pid);
-            continue;
-        }
-
-        int pid = bg ? sys_spawn(cmd0) : sys_spawn_fg(cmd0);
-        if (pid < 0) {
-            sys_write("ush: cannot run: ");
-            sys_write(cmd0);
-            sys_write("\n");
-            continue;
-        }
-        if (!bg)
-            sys_wait(pid); /* keyboard returns to us when the child dies */
+        if (rn > 0)
+            run_line(raw);
     }
 }
