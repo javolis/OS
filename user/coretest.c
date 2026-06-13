@@ -53,6 +53,24 @@ void _start(void) {
           "sort");
     check("uniq.elf", "a\na\nb\nb\nb\na\n", "a\nb\na\n", "uniq");
 
+    /* tee: passthrough on stdout AND a copy left in the named file. */
+    {
+        int ok = run_filter("tee.elf teefile", "hi\nthere\n", "hi\nthere\n");
+        int fd = sys_open("teefile");
+        char b[64];
+        int m = (fd >= 0) ? sys_read(fd, b, sizeof(b) - 1) : -1;
+        if (fd >= 0)
+            sys_close(fd);
+        b[m > 0 ? m : 0] = '\0';
+        if (ok && ustreq(b, "hi\nthere\n")) {
+            passed++;
+        } else {
+            failed++;
+            uprintf("  FAIL: tee\n");
+        }
+        sys_unlink("teefile");
+    }
+
     if (failed == 0)
         uprintf("coretest: all ok (%d filters)\n", passed);
     else
