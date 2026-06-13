@@ -135,6 +135,25 @@ else
     fail=1
 fi
 
+# Framebuffer: GRUB should provide a linear 32bpp surface (QEMU's VGA
+# supports it). The test pattern's non-zero checksum proves we mapped the
+# framebuffer and wrote pixels to it. (A text-only setup logs 'none' and
+# falls back to VGA, which is also acceptable - so accept either, but the
+# white box must not checksum to zero when a framebuffer is present.)
+if grep -qE "framebuffer: [0-9]+x[0-9]+ 32bpp; checksum [0-9a-f]+" "$SERIAL_LOG"; then
+    if grep -qE "checksum 00000000$" "$SERIAL_LOG"; then
+        echo "FAIL: framebuffer present but test pattern checksum is zero" >&2
+        fail=1
+    else
+        echo "PASS: framebuffer mapped and drawn (non-zero checksum)"
+    fi
+elif grep -q "framebuffer: none" "$SERIAL_LOG"; then
+    echo "PASS: no framebuffer; VGA text fallback (acceptable)"
+else
+    echo "FAIL: no framebuffer status reported" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then
