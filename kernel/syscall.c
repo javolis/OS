@@ -1,4 +1,5 @@
 /* syscall.c — int 0x80 system call dispatch. */
+#include <stddef.h>
 #include <stdint.h>
 
 #include "file.h"
