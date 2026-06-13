@@ -68,6 +68,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r a m t e s t dot e l f ret \
                r u n spc a p p e n d t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
+               r u n spc l s dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -368,6 +369,15 @@ if grep -q "killtest: killed child cleanly" "$SERIAL_LOG"; then
     echo "PASS: userland SYS_KILL terminated a child"
 else
     echo "FAIL: userland kill did not work" >&2
+    fail=1
+fi
+
+# Directory listing: ls.elf enumerates files via SYS_READDIR with sizes
+# and a r/w flag. notes.txt is a 135-byte read-only initrd file.
+if grep -qE "135 r notes.txt" "$SERIAL_LOG"; then
+    echo "PASS: ls listed a file with its size via readdir"
+else
+    echo "FAIL: ls did not report notes.txt size" >&2
     fail=1
 fi
 

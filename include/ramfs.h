@@ -30,3 +30,6 @@ int ramfs_unlink(const char *name);
 
 /* Print "<size>  <name>" for each file via kprintf. */
 void ramfs_list(void);
+
+/* Enumerate used files by index: fills name/size, returns 1 or 0. */
+int ramfs_entry(uint32_t idx, const char **name_out, uint32_t *size_out);

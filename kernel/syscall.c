@@ -368,6 +368,43 @@ void syscall_handle(struct registers *regs) {
         regs->eax = (uint32_t)sched_kill(regs->ebx);
         return;
 
+    case SYS_READDIR: {
+        if (!user_range_writable(regs->ecx, sizeof(struct dirent))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct dirent *d = (struct dirent *)regs->ecx;
+        const char *name;
+        uint32_t size, idx = regs->ebx;
+        int n_initrd = 0;
+        {
+            const char *nm;
+            uint32_t sz;
+            while (initrd_entry((uint32_t)n_initrd, &nm, &sz))
+                n_initrd++;
+        }
+        int kind;
+        if ((int)idx < n_initrd) {
+            initrd_entry(idx, &name, &size);
+            kind = 0;
+        } else if (ramfs_entry(idx - (uint32_t)n_initrd, &name, &size)) {
+            kind = 1;
+        } else {
+            regs->eax = (uint32_t)-1; /* past the end */
+            return;
+        }
+        uint32_t i = 0;
+        while (name[i] && i < sizeof(d->name) - 1) {
+            d->name[i] = name[i];
+            i++;
+        }
+        d->name[i] = '\0';
+        d->size = size;
+        d->kind = (uint32_t)kind;
+        regs->eax = 0;
+        return;
+    }
+
     case SYS_READ: {
         struct file *f = sched_get_fd((int)regs->ebx);
         uint32_t buf = regs->ecx, n = regs->edx;

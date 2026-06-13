@@ -35,6 +35,15 @@
 #define SYS_UNLINK 17   /* ebx = name; remove a ramfs file; 0 or -1 */
 #define SYS_KILL 18     /* ebx = pid; terminate a task; 0 or -1. No
                          * permission model yet: any task may kill any. */
+#define SYS_READDIR 19  /* ebx = index, ecx = struct dirent* (writable);
+                         * enumerates initrd then ramfs; 0 or -1 at end */
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct dirent {
+    char name[32];
+    uint32_t size;
+    uint32_t kind; /* 0 = initrd (read-only), 1 = ramfs (read/write) */
+};
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct systime {
