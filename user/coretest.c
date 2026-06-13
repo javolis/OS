@@ -50,6 +50,8 @@ static void check(const char *cmd, const char *in, const char *exp,
 void _start(void) {
     check("grep.elf bet", "alpha\nbeta\ngamma\n", "beta\n", "grep");
     check("calc.elf", "3 4 + 5 *\n", "35\n", "calc");
+    check("kv.elf", "set color blue\nget color\nget none\n",
+          "blue\n(nil)\n", "kv");
     check("sort.elf", "banana\napple\ncherry\n", "apple\nbanana\ncherry\n",
           "sort");
     check("uniq.elf", "a\na\nb\nb\nb\na\n", "a\nb\na\n", "uniq");
