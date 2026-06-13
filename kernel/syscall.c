@@ -478,6 +478,33 @@ void syscall_handle(struct registers *regs) {
         regs->eax = (uint32_t)sched_kill(regs->ebx);
         return;
 
+    case SYS_SBRK: {
+        int incr = (int)regs->ebx;
+        uint32_t old = sched_brk();
+        uint32_t top = sched_brk_top();
+        uint32_t newbrk = old + (uint32_t)incr;
+        if (newbrk < USER_HEAP_BASE || newbrk > USER_HEAP_LIMIT) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        uint32_t dir = paging_active_directory();
+        while (top < newbrk) { /* map fresh, zeroed user pages */
+            uint32_t frame = pmm_alloc_frame();
+            if (!frame) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+            uint8_t *z = phys_to_virt(frame);
+            for (int i = 0; i < 4096; i++)
+                z[i] = 0;
+            paging_map_user_in(dir, top, frame, 1);
+            top += 4096;
+        }
+        sched_set_brk(newbrk, top);
+        regs->eax = old;
+        return;
+    }
+
     case SYS_READDIR: {
         if (!user_range_writable(regs->ecx, sizeof(struct dirent))) {
             regs->eax = (uint32_t)-1;

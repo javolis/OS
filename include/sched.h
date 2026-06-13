@@ -57,6 +57,11 @@ uint32_t sched_alive_count(void);
 
 uint32_t sched_current_pid(void);
 
+/* Current task's user heap break (SYS_SBRK; syscall context). */
+uint32_t sched_brk(void);
+uint32_t sched_brk_top(void);
+void sched_set_brk(uint32_t brk, uint32_t top);
+
 /* Current task's file-descriptor table (syscall context). */
 struct file;
 struct file *sched_get_fd(int fd);

@@ -37,6 +37,8 @@
                          * permission model yet: any task may kill any. */
 #define SYS_READDIR 19  /* ebx = index, ecx = struct dirent* (writable);
                          * enumerates initrd then ramfs; 0 or -1 at end */
+#define SYS_SBRK 20     /* ebx = signed increment; grows the per-process
+                         * heap and returns the old break, or -1 */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

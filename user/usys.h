@@ -124,6 +124,13 @@ static inline int sys_readdir(int index, struct dirent *out) {
     return ret;
 }
 
+/* Grow the heap by `incr` bytes; returns the old break, or (void*)-1. */
+static inline void *sys_sbrk(int incr) {
+    void *ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(20), "b"(incr));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

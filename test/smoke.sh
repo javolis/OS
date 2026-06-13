@@ -76,6 +76,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc d e v t e s t dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
+               r u n spc s b r k t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -427,6 +428,15 @@ if [ "$zqx_count" -ge 2 ]; then
     echo "PASS: readline history recalled a command (zqx x${zqx_count})"
 else
     echo "FAIL: history recall did not re-run the command (x${zqx_count})" >&2
+    fail=1
+fi
+
+# SYS_SBRK: grow the heap and use it across a page boundary; a second
+# sbrk hands back a higher contiguous region.
+if grep -q "sbrktest: heap grows ok" "$SERIAL_LOG"; then
+    echo "PASS: SYS_SBRK grows a per-process heap"
+else
+    echo "FAIL: SYS_SBRK misbehaved" >&2
     fail=1
 fi
 
