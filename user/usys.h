@@ -100,6 +100,13 @@ static inline int sys_unlink(const char *name) {
     return ret;
 }
 
+/* Terminate a task by pid. Returns 0 or -1. */
+static inline int sys_kill(int pid) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(18), "b"(pid));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;
