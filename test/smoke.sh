@@ -72,6 +72,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
                r u n spc r u n t e s t s dot e l f ret \
                r u n spc d e v t e s t dot e l f ret \
+               r u n spc c o r e t e s t dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -411,6 +412,15 @@ if grep -q "devtest: dev files ok" "$SERIAL_LOG"; then
     echo "PASS: /dev/null and /dev/zero behave"
 else
     echo "FAIL: device files misbehaved" >&2
+    fail=1
+fi
+
+# Coreutils filters: coretest pipes known input through each filter and
+# checks the output. 'all ok' only prints if every filter passed.
+if grep -q "coretest: all ok" "$SERIAL_LOG"; then
+    echo "PASS: coreutils filters behave"
+else
+    echo "FAIL: a coreutils filter misbehaved" >&2
     fail=1
 fi
 
