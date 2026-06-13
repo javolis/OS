@@ -34,7 +34,7 @@ INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar
 
-.PHONY: all iso run test clean
+.PHONY: all iso run test test-uefi clean
 
 all: $(KERNEL)
 
@@ -68,6 +68,10 @@ run: iso
 
 test: iso
 	bash test/smoke.sh $(ISO)
+
+# Boot the same ISO under UEFI firmware (OVMF) — the Hyper-V Gen 2 path.
+test-uefi: iso
+	bash test/smoke-uefi.sh $(ISO)
 
 clean:
 	rm -rf $(OBJ) $(KERNEL) $(ISO) $(INITRD) isodir user/*.o user/*.elf
