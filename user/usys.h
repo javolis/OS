@@ -104,6 +104,18 @@ static inline int sys_close(int fd) {
     return ret;
 }
 
+/* Keep in sync with the kernel's struct systime in include/syscall.h. */
+struct systime {
+    unsigned short year;
+    unsigned char month, day, hour, minute, second;
+};
+
+static inline int sys_time(struct systime *out) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(14), "b"(out) : "memory");
+    return ret;
+}
+
 /* Create a pipe: fds[0] = read end, fds[1] = write end. Returns 0 or -1. */
 static inline int sys_pipe(int fds[2]) {
     int ret;

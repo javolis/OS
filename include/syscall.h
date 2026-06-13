@@ -27,6 +27,13 @@
 #define SYS_PIPE 12     /* ebx = int[2]; fills {read fd, write fd} */
 #define SYS_SPAWN_IO 13 /* ebx = cmdline, ecx = stdin fd, edx = stdout fd
                          * (-1 = console); background; returns pid or -1 */
+#define SYS_TIME 14     /* ebx = struct systime* (user, writable) */
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct systime {
+    uint16_t year;
+    uint8_t month, day, hour, minute, second;
+};
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct sysinfo {

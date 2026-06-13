@@ -58,6 +58,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c l o c k dot e l f ret \
                ctrl-c \
                e c h o spc i n t a c t ret \
+               r u n spc d a t e dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
@@ -284,6 +285,15 @@ if grep -q "NEXT STOP: PIPES." "$SERIAL_LOG"; then
     echo "PASS: ush pipeline ran (cat | upper)"
 else
     echo "FAIL: pipeline produced no uppercased output" >&2
+    fail=1
+fi
+
+# RTC: date.elf prints a well-formed wall-clock timestamp from the CMOS
+# clock (value depends on the host; only the format is asserted).
+if grep -qE "date: [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}" "$SERIAL_LOG"; then
+    echo "PASS: RTC reported a well-formed timestamp"
+else
+    echo "FAIL: date produced no valid timestamp" >&2
     fail=1
 fi
 

@@ -12,6 +12,7 @@
 #include "pipe.h"
 #include "pmm.h"
 #include "process.h"
+#include "rtc.h"
 #include "sched.h"
 #include "serial.h"
 #include "syscall.h"
@@ -360,6 +361,24 @@ void syscall_handle(struct registers *regs) {
         si->free_frames = pmm_free_frames();
         si->total_frames = pmm_total_frames();
         si->tasks_alive = sched_alive_count();
+        regs->eax = 0;
+        return;
+    }
+
+    case SYS_TIME: {
+        if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct rtc_time t;
+        rtc_read(&t);
+        struct systime *st = (struct systime *)regs->ebx;
+        st->year = t.year;
+        st->month = t.month;
+        st->day = t.day;
+        st->hour = t.hour;
+        st->minute = t.minute;
+        st->second = t.second;
         regs->eax = 0;
         return;
     }
