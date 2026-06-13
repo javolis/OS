@@ -86,6 +86,46 @@ linker.ld    kernel link script
 Makefile     build orchestration
 ```
 
+## Running it in a VM
+
+`make iso` produces `os.iso`, a bootable CD image. Boot it however you like:
+
+```sh
+make run                              # QEMU (what CI uses)
+qemu-system-i386 -cdrom os.iso        # QEMU directly
+```
+
+It also boots in VirtualBox/VMware — create a VM (other/unknown OS, ~128 MB
+RAM) with `os.iso` as the optical drive. You'll land at the kernel shell;
+type `help`, then `run ush.elf` for the user-mode shell (pipelines,
+redirection, history, `run <prog>`). If you don't want to build the
+toolchain locally, download the `os-iso` artifact from any green
+[CI run](https://github.com/javolis/OS/actions).
+
+## Writing your own app
+
+Userland programs are freestanding ELF executables that talk to the
+kernel through `int 0x80` (see `user/usys.h`) and may use the small C
+library `user/ulib.h` (`uprintf`, `umalloc`/`ufree`, the `ustr*`/`umem*`
+helpers, and the `ufopen`/`ufgets` stdio reader). To add one:
+
+1. Copy `user/template.c` to `user/myapp.c` and edit `_start`.
+2. Add `user/myapp.elf` to `USER_ELFS` in the `Makefile`.
+3. `make iso`, boot, and `run myapp.elf` (or `run myapp.elf arg1 arg2`).
+
+```c
+#include "ulib.h"
+void _start(int argc, char **argv) {
+    uprintf("hello from %s\n", argc >= 2 ? argv[1] : "my app");
+    sys_exit(0);
+}
+```
+
+Programs get argc/argv, a 16 KiB stack, an on-demand heap (`umalloc`), and
+fds 0/1 wired to the console (or to pipes/files when launched with `|`,
+`<`, `>` from a shell). A ring-3 fault kills only your program, not the
+system, so it's safe to experiment.
+
 ## References
 
 - https://wiki.osdev.org — the canonical hobby-OS resource
