@@ -26,24 +26,43 @@ static char *trim(char *s) {
     return s;
 }
 
-/* Run "left | right": left's stdout and right's stdin share a pipe. ush
- * drops both ends after spawning so the writer-closed EOF reaches right. */
-static void run_pipeline(char *left, char *right) {
-    int p[2];
-    if (sys_pipe(p) != 0) {
-        sys_write("ush: pipe failed\n");
-        return;
+/* Up to 4 stages: each boundary needs a pipe (2 fds) open in ush at once,
+ * and ush's 8-slot table already spends 2 on the console. */
+#define MAX_STAGES 4
+
+/* Run cmds[0] | cmds[1] | ... | cmds[n-1]: stage i's stdout feeds stage
+ * i+1's stdin through a pipe; the first reads the console, the last writes
+ * it. ush opens every pipe, spawns every stage (each dups the ends it
+ * needs), then drops all its own ends so each writer-closed EOF lands. */
+static void run_pipeline(char *cmds[], int n) {
+    int pipes[MAX_STAGES - 1][2];
+    int np = n - 1;
+
+    for (int i = 0; i < np; i++) {
+        if (sys_pipe(pipes[i]) != 0) {
+            sys_write("ush: pipe failed\n");
+            for (int j = 0; j < i; j++) {
+                sys_close(pipes[j][0]);
+                sys_close(pipes[j][1]);
+            }
+            return;
+        }
     }
-    int pl = sys_spawn_io(left, -1, p[1]);  /* stdout -> pipe write */
-    int pr = sys_spawn_io(right, p[0], -1); /* stdin  <- pipe read */
-    sys_close(p[0]);
-    sys_close(p[1]);
-    if (pl < 0 || pr < 0) {
-        sys_write("ush: cannot run pipeline\n");
-        return;
+
+    int pids[MAX_STAGES];
+    for (int i = 0; i < n; i++) {
+        int in_fd = (i == 0) ? -1 : pipes[i - 1][0];
+        int out_fd = (i == n - 1) ? -1 : pipes[i][1];
+        pids[i] = sys_spawn_io(cmds[i], in_fd, out_fd);
     }
-    sys_wait(pl);
-    sys_wait(pr);
+
+    for (int i = 0; i < np; i++) {
+        sys_close(pipes[i][0]);
+        sys_close(pipes[i][1]);
+    }
+    for (int i = 0; i < n; i++)
+        if (pids[i] >= 0)
+            sys_wait(pids[i]);
 }
 
 void _start(void) {
@@ -67,27 +86,49 @@ void _start(void) {
         if (streq(line, "help")) {
             sys_write("ush builtins: help, exit\n"
                       "run initrd programs: <file.elf> [args...] [&]\n"
-                      "pipelines: <a> | <b>\n");
+                      "pipelines: <a> | <b> | <c> ...\n");
             continue;
         }
 
-        /* A single '|' splits the line into a two-stage pipeline. */
-        int bar = -1;
-        for (int i = 0; i < n; i++) {
-            if (line[i] == '|') {
-                bar = i;
-                break;
+        /* Split on '|' into pipeline stages. */
+        char *cmds[MAX_STAGES];
+        int nstage = 0;
+        int ok = 1;
+        int start = 0;
+        for (int i = 0; i <= n; i++) {
+            if (i == n || line[i] == '|') {
+                line[i] = '\0';
+                if (nstage >= MAX_STAGES) {
+                    ok = 0;
+                    break;
+                }
+                cmds[nstage] = trim(line + start);
+                if (*cmds[nstage] == '\0') {
+                    ok = 0; /* empty stage, e.g. 'a |' or 'a || b' */
+                    break;
+                }
+                nstage++;
+                start = i + 1;
             }
         }
-        if (bar >= 0) {
-            line[bar] = '\0';
-            char *left = trim(line);
-            char *right = trim(line + bar + 1);
-            if (*left && *right)
-                run_pipeline(left, right);
-            else
-                sys_write("ush: malformed pipeline\n");
+        if (!ok) {
+            sys_write("ush: malformed pipeline\n");
             continue;
+        }
+        if (nstage > 1) {
+            run_pipeline(cmds, nstage);
+            continue;
+        }
+        /* Single stage: fall through with the trimmed command. */
+        {
+            char *c = cmds[0];
+            int j = 0;
+            while (c[j]) {
+                line[j] = c[j];
+                j++;
+            }
+            line[j] = '\0';
+            n = j;
         }
 
         /* Trailing '&' runs the program in the background. */
