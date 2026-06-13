@@ -26,6 +26,76 @@ static char *trim(char *s) {
     return s;
 }
 
+/* --- shell variables: a tiny fixed table, set NAME=VALUE and $NAME --- */
+#define VAR_MAX 8
+#define VAR_NAME_MAX 16
+#define VAR_VAL_MAX 64
+
+static char var_name[VAR_MAX][VAR_NAME_MAX];
+static char var_val[VAR_MAX][VAR_VAL_MAX];
+static int var_used[VAR_MAX];
+
+static int ident_char(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_';
+}
+
+static const char *var_get(const char *name) {
+    for (int i = 0; i < VAR_MAX; i++)
+        if (var_used[i] && streq(var_name[i], name))
+            return var_val[i];
+    return 0;
+}
+
+static void var_set(const char *name, const char *val) {
+    int slot = -1;
+    for (int i = 0; i < VAR_MAX; i++) {
+        if (var_used[i] && streq(var_name[i], name)) {
+            slot = i;
+            break;
+        }
+        if (slot < 0 && !var_used[i])
+            slot = i;
+    }
+    if (slot < 0)
+        return; /* table full */
+    var_used[slot] = 1;
+    int i = 0;
+    while (name[i] && i < VAR_NAME_MAX - 1) {
+        var_name[slot][i] = name[i];
+        i++;
+    }
+    var_name[slot][i] = '\0';
+    i = 0;
+    while (val[i] && i < VAR_VAL_MAX - 1) {
+        var_val[slot][i] = val[i];
+        i++;
+    }
+    var_val[slot][i] = '\0';
+}
+
+/* Expand $NAME references in src into dst (size dstmax). Unset vars
+ * expand to nothing; a lone '$' or '$<non-ident>' is copied verbatim. */
+static void expand_vars(const char *src, char *dst, int dstmax) {
+    int di = 0;
+    for (int i = 0; src[i] && di < dstmax - 1;) {
+        if (src[i] == '$' && ident_char(src[i + 1])) {
+            i++;
+            char name[VAR_NAME_MAX];
+            int ni = 0;
+            while (ident_char(src[i]) && ni < VAR_NAME_MAX - 1)
+                name[ni++] = src[i++];
+            name[ni] = '\0';
+            const char *v = var_get(name);
+            while (v && *v && di < dstmax - 1)
+                dst[di++] = *v++;
+        } else {
+            dst[di++] = src[i++];
+        }
+    }
+    dst[di] = '\0';
+}
+
 /* Strip '< in', '> out', and '>> out' redirections from cmd in place,
  * setting the infile and outfile outputs to the filenames (NULL if
  * absent) and *append to 1 for '>>'. Returns 0, or -1 if a redirection
@@ -115,30 +185,54 @@ static void run_pipeline(char *cmds[], int n) {
 }
 
 void _start(void) {
-    char line[96];
+    char raw[128];
+    char line[256];
 
     sys_write("ush: user-mode shell (type 'help')\n");
     for (;;) {
         sys_write("ush$ ");
-        int n = sys_readline(line, sizeof(line));
-        if (n < 0) {
+        int rn = sys_readline(raw, sizeof(raw));
+        if (rn < 0) {
             sys_write("ush: lost the keyboard, exiting\n");
             sys_exit(0);
         }
-        if (n == 0)
+        if (rn == 0)
             continue;
 
-        if (streq(line, "exit")) {
+        if (streq(raw, "exit")) {
             sys_write("ush: bye\n");
             sys_exit(0);
         }
-        if (streq(line, "help")) {
-            sys_write("ush builtins: help, exit, rm <file>\n"
+        if (streq(raw, "help")) {
+            sys_write("ush builtins: help, exit, rm <file>, set NAME=VAL\n"
                       "run: <file.elf> [args...] [&]\n"
                       "pipelines: <a> | <b> | <c> ...\n"
-                      "redirection: <cmd> > out, >> out (append), < in\n");
+                      "redirection: <cmd> > out, >> out (append), < in\n"
+                      "variables: set X=val then $X\n");
             continue;
         }
+        /* 'set NAME=VALUE' stores a variable (value taken raw). */
+        if (raw[0] == 's' && raw[1] == 'e' && raw[2] == 't' &&
+            raw[3] == ' ') {
+            char *a = trim(raw + 4);
+            int e = 0;
+            while (a[e] && a[e] != '=')
+                e++;
+            if (a[e] != '=' || e == 0) {
+                sys_write("ush: usage: set NAME=VALUE\n");
+            } else {
+                a[e] = '\0';
+                var_set(a, a + e + 1);
+            }
+            continue;
+        }
+
+        /* Expand $VARs into the working buffer used by everything below. */
+        expand_vars(raw, line, sizeof(line));
+        int n = 0;
+        while (line[n])
+            n++;
+
         if (line[0] == 'r' && line[1] == 'm' && line[2] == ' ') {
             char *f = trim(line + 3);
             if (*f == '\0')
