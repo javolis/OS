@@ -23,7 +23,8 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/upper.elf user/spawnstorm.elf user/date.elf \
              user/ramtest.elf user/emit.elf user/wc.elf user/head.elf \
              user/appendtest.elf user/killtest.elf user/ls.elf \
-             user/runtests.elf user/devtest.elf
+             user/runtests.elf user/devtest.elf user/grep.elf \
+             user/coretest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush
 INITRD    := initrd.tar
 
