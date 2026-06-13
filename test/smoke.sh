@@ -59,6 +59,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                ctrl-c \
                e c h o spc i n t a c t ret \
                r u n spc d a t e dot e l f ret \
+               r u n spc r a m t e s t dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.3
@@ -295,6 +296,15 @@ if grep -qE "date: [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}" "$SERI
     echo "PASS: RTC reported a well-formed timestamp"
 else
     echo "FAIL: date produced no valid timestamp" >&2
+    fail=1
+fi
+
+# ramfs: create a file, write, reopen, read back. The readback line
+# only appears if the writable filesystem round-trips.
+if grep -q "ramtest: ramfs round-trip works" "$SERIAL_LOG"; then
+    echo "PASS: ramfs create/write/read round-trip"
+else
+    echo "FAIL: ramfs round-trip did not work" >&2
     fail=1
 fi
 

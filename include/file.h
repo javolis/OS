@@ -9,9 +9,11 @@ enum file_kind {
     FILE_INITRD,      /* read-only view of an initrd file */
     FILE_PIPE_READ,   /* read end of a pipe */
     FILE_PIPE_WRITE,  /* write end of a pipe */
+    FILE_RAMFS,       /* read/write view of a writable ramfs file */
 };
 
 struct pipe;
+struct ramfs_file;
 
 struct file {
     int kind;
@@ -19,7 +21,8 @@ struct file {
     const uint8_t *data; /* FILE_INITRD */
     uint32_t size;
     uint32_t offset;
-    struct pipe *pipe; /* FILE_PIPE_* */
+    struct pipe *pipe;         /* FILE_PIPE_* */
+    struct ramfs_file *rfile;  /* FILE_RAMFS */
 };
 
 /* The shared console object (fds 0/1 of every process). Never freed: its

@@ -28,6 +28,7 @@ struct file *file_alloc(int kind) {
     f->size = 0;
     f->offset = 0;
     f->pipe = NULL;
+    f->rfile = NULL;
     return f;
 }
 

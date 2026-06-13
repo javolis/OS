@@ -11,6 +11,7 @@
 #include "kprintf.h"
 #include "pmm.h"
 #include "process.h"
+#include "ramfs.h"
 #include "rtc.h"
 #include "sched.h"
 #include "serial.h"
@@ -173,8 +174,10 @@ void shell_run(void) {
                     "history ls run ps kill date\n");
         else if (streq(cmd, "ps"))
             sched_ps();
-        else if (streq(cmd, "ls"))
+        else if (streq(cmd, "ls")) {
             initrd_list();
+            ramfs_list();
+        }
         else if (streq(cmd, "date")) {
             struct rtc_time t;
             rtc_read(&t);

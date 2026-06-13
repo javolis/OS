@@ -37,7 +37,8 @@ spawn / wait / sysinfo / open / read / writefd / close / pipe / spawn_io
 / time — user programs can launch other programs, collect their exit
 codes via wait (which also reclaims the child), stream initrd files
 through per-process file descriptors (cat.elf), connect through pipes,
-and read the wall clock from the CMOS RTC (date.elf); ush.elf is a
+read/write a small in-RAM filesystem (ramfs, alongside the read-only
+initrd), and read the wall clock from the CMOS RTC (date.elf); ush.elf is a
 complete shell running in ring 3 with `a | b` pipelines (e.g. cat
 notes.txt | upper) and a tiny user libc providing uprintf); sleep
 blocks properly — the scheduler runs other tasks,

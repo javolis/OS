@@ -12,6 +12,7 @@
 #include "pipe.h"
 #include "pmm.h"
 #include "process.h"
+#include "ramfs.h"
 #include "rtc.h"
 #include "sched.h"
 #include "serial.h"
@@ -59,6 +60,21 @@ static int user_range_ok(uint32_t addr, uint32_t len, int need_write) {
 }
 
 #define user_range_writable(addr, len) user_range_ok(addr, len, 1)
+
+/* Copy a validated user filename into a kernel buffer. Returns 0 on
+ * success, -1 if the pointer is bad. */
+static int copy_user_name(uint32_t addr, char *dst, uint32_t max) {
+    if (!user_string_ok(addr))
+        return -1;
+    const char *src = (const char *)addr;
+    uint32_t i = 0;
+    while (src[i] && i + 1 < max) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+    return 0;
+}
 
 /* Raw byte write to the screen + serial, atomically. */
 static void console_write(const char *s, uint32_t n) {
@@ -250,32 +266,59 @@ void syscall_handle(struct registers *regs) {
     }
 
     case SYS_OPEN: {
-        if (!user_string_ok(regs->ebx)) {
+        char name[RAMFS_NAME_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
             regs->eax = (uint32_t)-1;
             return;
         }
-        char name[64];
-        const char *src = (const char *)regs->ebx;
-        uint32_t n = 0;
-        while (src[n] && n + 1 < sizeof(name)) {
-            name[n] = src[n];
-            n++;
+        /* ramfs takes precedence over the read-only initrd. */
+        struct ramfs_file *rf = ramfs_find(name);
+        struct file *f;
+        if (rf) {
+            f = file_alloc(FILE_RAMFS);
+            if (f)
+                f->rfile = rf;
+        } else {
+            uint32_t size;
+            const void *data = initrd_find(name, &size);
+            if (!data) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+            f = file_alloc(FILE_INITRD);
+            if (f) {
+                f->data = data;
+                f->size = size;
+            }
         }
-        name[n] = '\0';
-
-        uint32_t size;
-        const void *data = initrd_find(name, &size);
-        if (!data) {
-            regs->eax = (uint32_t)-1;
-            return;
-        }
-        struct file *f = file_alloc(FILE_INITRD);
         if (!f) {
             regs->eax = (uint32_t)-1;
             return;
         }
-        f->data = data;
-        f->size = size;
+        int fd = sched_install_fd(f);
+        if (fd < 0)
+            file_unref(f);
+        regs->eax = (uint32_t)fd;
+        return;
+    }
+
+    case SYS_CREATE: {
+        char name[RAMFS_NAME_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct ramfs_file *rf = ramfs_create(name);
+        if (!rf) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct file *f = file_alloc(FILE_RAMFS);
+        if (!f) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        f->rfile = rf;
         int fd = sched_install_fd(f);
         if (fd < 0)
             file_unref(f);
@@ -307,13 +350,21 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1; /* wrong end */
             return;
         }
-        /* FILE_INITRD */
-        uint32_t left = f->size - f->offset;
+        /* FILE_INITRD / FILE_RAMFS: byte stream by offset, 0 at EOF. */
+        const uint8_t *fdata;
+        uint32_t fsize;
+        if (f->kind == FILE_RAMFS) {
+            fdata = f->rfile->data;
+            fsize = f->rfile->size;
+        } else {
+            fdata = f->data;
+            fsize = f->size;
+        }
+        uint32_t left = (f->offset < fsize) ? fsize - f->offset : 0;
         uint32_t take = n < left ? n : left;
-        const uint8_t *src = f->data + f->offset;
         uint8_t *dst = (uint8_t *)buf;
         for (uint32_t i = 0; i < take; i++)
-            dst[i] = src[i];
+            dst[i] = fdata[f->offset + i];
         f->offset += take;
         regs->eax = take; /* 0 = EOF */
         return;
@@ -328,6 +379,13 @@ void syscall_handle(struct registers *regs) {
         }
         if (f->kind == FILE_PIPE_WRITE) {
             regs->eax = (uint32_t)pipe_write(f, (const uint8_t *)buf, n);
+            return;
+        }
+        if (f->kind == FILE_RAMFS) {
+            int w = ramfs_write(f->rfile, f->offset, (const uint8_t *)buf, n);
+            if (w >= 0)
+                f->offset += (uint32_t)w;
+            regs->eax = (uint32_t)w;
             return;
         }
         if (f->kind != FILE_CONSOLE) {
