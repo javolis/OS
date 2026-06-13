@@ -77,6 +77,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
+               r u n spc m a l l o c t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -437,6 +438,15 @@ if grep -q "sbrktest: heap grows ok" "$SERIAL_LOG"; then
     echo "PASS: SYS_SBRK grows a per-process heap"
 else
     echo "FAIL: SYS_SBRK misbehaved" >&2
+    fail=1
+fi
+
+# umalloc/ufree: alloc/write/free, freed-block reuse, and a large alloc
+# that grows the heap via sbrk.
+if grep -q "malloctest: heap ok" "$SERIAL_LOG"; then
+    echo "PASS: user malloc/free over sbrk"
+else
+    echo "FAIL: user malloc/free misbehaved" >&2
     fail=1
 fi
 

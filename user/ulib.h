@@ -22,3 +22,7 @@ int uatoi(const char *s);
 /* printf-lite to the console (one atomic sys_write per call).
  * Supports %s %c %d %u %x %%. */
 void uprintf(const char *fmt, ...);
+
+/* Heap allocator over sys_sbrk: a first-fit free list with split/coalesce. */
+void *umalloc(uint32_t size); /* NULL on exhaustion or size 0 */
+void ufree(void *ptr);        /* NULL is a no-op */
