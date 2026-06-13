@@ -12,7 +12,8 @@
 
 MBALIGN  equ 1 << 0            ; align loaded modules on page boundaries
 MEMINFO  equ 1 << 1            ; provide memory map
-MBFLAGS  equ MBALIGN | MEMINFO
+VIDEO    equ 1 << 2            ; request a linear-framebuffer video mode
+MBFLAGS  equ MBALIGN | MEMINFO | VIDEO
 MAGIC    equ 0x1BADB002        ; Multiboot 1 magic number
 CHECKSUM equ -(MAGIC + MBFLAGS)
 
@@ -24,6 +25,14 @@ align 4
     dd MAGIC
     dd MBFLAGS
     dd CHECKSUM
+    ; address fields (unused: AOUT-kludge bit is not set), then the video
+    ; request. mode_type 0 = linear graphics; 0 width/height lets the
+    ; loader choose; prefer 32 bpp.
+    dd 0, 0, 0, 0, 0           ; header/load/load_end/bss_end/entry addrs
+    dd 0                       ; mode_type: linear framebuffer
+    dd 0                       ; width  (no preference)
+    dd 0                       ; height (no preference)
+    dd 32                      ; depth  (bits per pixel, preferred)
 
 section .boot
 global _start

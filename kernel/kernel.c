@@ -1,6 +1,7 @@
 /* kernel.c — freestanding kernel entry. */
 #include <stdint.h>
 
+#include "fb.h"
 #include "gdt.h"
 #include "idt.h"
 #include "initrd.h"
@@ -82,6 +83,23 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     if (!initrd_present()) {
         kprintf("PANIC: initrd module missing (check grub.cfg)\n");
         halt_forever();
+    }
+
+    /* Framebuffer: if the bootloader gave us a linear 32bpp surface, map
+     * it and paint a recognizable test pattern (dark-blue field + a white
+     * box). Visible proof the video path works on real firmware; CI can't
+     * see pixels, so we also log geometry + a checksum over serial. The
+     * full framebuffer text console comes next. */
+    if (fb_init(mbi)) {
+        fb_fill(0x00000033); /* dark blue */
+        fb_fillrect(fb_width() / 2 - 100, fb_height() / 2 - 60, 200, 120,
+                    0x00FFFFFF); /* centered white box */
+        kprintf("framebuffer: %lux%lu 32bpp; checksum %08lx\n", fb_width(),
+                fb_height(),
+                fb_checksum(fb_width() / 2 - 100, fb_height() / 2 - 60, 200,
+                            120));
+    } else {
+        kprintf("framebuffer: none (using VGA text console)\n");
     }
 
     /* Prove the IDT actually works: int3 lands in isr_handler (which prints
