@@ -14,8 +14,10 @@
 #define FRAME_SIZE 4096u
 #define MAX_ARGS 8
 
-/* One stack page, well clear of where the executables link (0x08048000+). */
-#define USER_STACK_VADDR 0x0BFFF000u
+/* User stack: STACK_PAGES pages ending at the top page, well clear of the
+ * executables (0x08048000+) and the heap window (ends at 0x0B000000). */
+#define USER_STACK_VADDR 0x0BFFF000u /* top (argv-staging) page */
+#define USER_STACK_PAGES 4           /* 16 KiB of stack */
 
 /* Build the initial user stack inside the (kernel-visible) stack frame:
  * argument strings at the top, the argv vector below them, then the
@@ -86,6 +88,20 @@ int process_spawn(const char *image_start, const char *image_end,
 
     uint32_t user_esp = build_user_stack(stk, cmdline);
     paging_map_user_in(dir, USER_STACK_VADDR, stack_frame, 1);
+
+    /* Map additional zeroed pages below the top so the stack can grow. */
+    for (int s = 1; s < USER_STACK_PAGES; s++) {
+        uint32_t f = pmm_alloc_frame();
+        if (!f) {
+            paging_destroy_address_space(dir); /* frees what we mapped */
+            return -1;
+        }
+        uint8_t *z = phys_to_virt(f);
+        for (uint32_t i = 0; i < FRAME_SIZE; i++)
+            z[i] = 0;
+        paging_map_user_in(dir, USER_STACK_VADDR - (uint32_t)s * FRAME_SIZE,
+                           f, 1);
+    }
 
     /* argv[0] (the first cmdline word) doubles as the ps name. */
     char name[16];
