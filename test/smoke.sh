@@ -80,6 +80,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc m a l l o c t e s t dot e l f ret \
                r u n spc s t a c k t e s t dot e l f ret \
                r u n spc s t d i o t e s t dot e l f ret \
+               r u n spc b i g b i n dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
@@ -440,6 +441,15 @@ if grep -q "sbrktest: heap grows ok" "$SERIAL_LOG"; then
     echo "PASS: SYS_SBRK grows a per-process heap"
 else
     echo "FAIL: SYS_SBRK misbehaved" >&2
+    fail=1
+fi
+
+# Large binary: a 64 KiB BSS (16 pages) loads zero-filled and usable,
+# proving the ELF loader handles multi-page segments.
+if grep -q "bigbin: 64k bss ok" "$SERIAL_LOG"; then
+    echo "PASS: multi-page binary (64k BSS) loads"
+else
+    echo "FAIL: large-binary BSS load" >&2
     fail=1
 fi
 
