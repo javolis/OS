@@ -1,8 +1,8 @@
-/* ush.c — userland shell: a shell that is itself a ring-3 program.
+/* ush.c - userland shell: a shell that is itself a ring-3 program.
  *
  * Reads lines via sys_readline (it runs as the foreground task), launches
  * initrd programs by name with sys_spawn / sys_spawn_fg, and waits on
- * foreground children — the keyboard comes back automatically because a
+ * foreground children - the keyboard comes back automatically because a
  * dying foreground task hands it to its parent. */
 #include "usys.h"
 
@@ -23,14 +23,14 @@ void _start(void) {
         int n = sys_readline(line, sizeof(line));
         if (n < 0) {
             sys_write("ush: lost the keyboard, exiting\n");
-            sys_exit();
+            sys_exit(0);
         }
         if (n == 0)
             continue;
 
         if (streq(line, "exit")) {
             sys_write("ush: bye\n");
-            sys_exit();
+            sys_exit(0);
         }
         if (streq(line, "help")) {
             sys_write("ush builtins: help, exit\n"

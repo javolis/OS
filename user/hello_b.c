@@ -1,4 +1,4 @@
-/* hello_b.c — userland: sibling of hello_a with its own message. */
+/* hello_b.c - userland: sibling of hello_a with its own message. */
 #include "usys.h"
 
 void _start(void) {
@@ -7,5 +7,5 @@ void _start(void) {
         for (volatile int spin = 0; spin < 10000000; spin++)
             ;
     }
-    sys_exit();
+    sys_exit(0);
 }

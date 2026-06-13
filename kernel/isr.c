@@ -74,7 +74,7 @@ void isr_handler(struct registers *regs) {
                                          : "to unmapped address",
                     cr2);
         kprintf("\n");
-        task_exit();
+        task_exit((uint32_t)-1);
     }
 
     kprintf("\nKERNEL PANIC: exception %lu (%s), error code %08lx\n",

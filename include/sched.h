@@ -27,8 +27,10 @@ void sched_sleep_current(uint32_t nticks);
 /* Block the calling task until keyboard input arrives (syscall context). */
 void sched_block_on_keyboard(void);
 
-/* Block the calling task until `pid` exits (syscall context). */
-void sched_wait_pid(uint32_t pid);
+/* Block the calling task until `pid` exits, then collect its exit status
+ * and reclaim it (syscall context). *status_out = (uint32_t)-1 if the pid
+ * is unknown or already collected. */
+void sched_wait_pid(uint32_t pid, uint32_t *status_out);
 
 /* Wake keyboard-blocked tasks (keyboard IRQ context). */
 void sched_wake_keyboard(void);
@@ -53,5 +55,5 @@ void sched_ps(void);
 /* Mark a ready/blocked user task zombie. 0 on success, -1 if no match. */
 int sched_kill(uint32_t pid);
 
-/* Terminate the calling task (used by the exit syscall). */
-void task_exit(void) __attribute__((noreturn));
+/* Terminate the calling task with an exit code (exit syscall, faults). */
+void task_exit(uint32_t code) __attribute__((noreturn));

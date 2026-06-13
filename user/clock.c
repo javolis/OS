@@ -1,6 +1,6 @@
-/* clock.c — userland: prints a tick five times at 300 ms intervals using
+/* clock.c - userland: prints a tick five times at 300 ms intervals using
  * the blocking sleep syscall. While it sleeps, the scheduler runs other
- * tasks — including the shell, which stays responsive between ticks. */
+ * tasks - including the shell, which stays responsive between ticks. */
 #include "usys.h"
 
 void _start(void) {
@@ -9,5 +9,5 @@ void _start(void) {
         sys_sleep(300);
     }
     sys_write("clock: done\n");
-    sys_exit();
+    sys_exit(0);
 }

@@ -8,8 +8,8 @@ static inline int sys_write(const char *s) {
     return ret;
 }
 
-static inline void sys_exit(void) {
-    __asm__ volatile("int $0x80" : : "a"(0));
+static inline void sys_exit(int code) {
+    __asm__ volatile("int $0x80" : : "a"(0), "b"(code));
     __builtin_unreachable();
 }
 

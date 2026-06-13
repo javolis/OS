@@ -1,4 +1,4 @@
-/* ulib.c — tiny userland library. */
+/* ulib.c - tiny userland library. */
 #include <stdarg.h>
 #include <stdint.h>
 
