@@ -21,7 +21,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/crash.elf user/echo.elf user/greet.elf user/runner.elf \
              user/ush.elf user/sysinfo.elf user/exitcode.elf user/cat.elf \
              user/upper.elf user/spawnstorm.elf user/date.elf \
-             user/ramtest.elf user/emit.elf
+             user/ramtest.elf user/emit.elf user/wc.elf user/head.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt
 INITRD    := initrd.tar
 
