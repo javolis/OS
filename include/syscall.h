@@ -33,6 +33,8 @@
 #define SYS_APPEND 16   /* ebx = name; open (or create) a ramfs file with
                          * the write offset at end-of-file; returns fd/-1 */
 #define SYS_UNLINK 17   /* ebx = name; remove a ramfs file; 0 or -1 */
+#define SYS_KILL 18     /* ebx = pid; terminate a task; 0 or -1. No
+                         * permission model yet: any task may kill any. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct systime {

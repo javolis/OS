@@ -364,6 +364,10 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_KILL:
+        regs->eax = (uint32_t)sched_kill(regs->ebx);
+        return;
+
     case SYS_READ: {
         struct file *f = sched_get_fd((int)regs->ebx);
         uint32_t buf = regs->ecx, n = regs->edx;

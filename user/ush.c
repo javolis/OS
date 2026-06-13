@@ -204,7 +204,8 @@ void _start(void) {
             sys_exit(0);
         }
         if (streq(raw, "help")) {
-            sys_write("ush builtins: help, exit, rm <file>, set NAME=VAL\n"
+            sys_write("ush builtins: help, exit, rm <file>, set NAME=VAL, "
+                      "kill <pid>\n"
                       "run: <file.elf> [args...] [&]\n"
                       "pipelines: <a> | <b> | <c> ...\n"
                       "redirection: <cmd> > out, >> out (append), < in\n"
@@ -239,6 +240,23 @@ void _start(void) {
                 sys_write("ush: rm needs a filename\n");
             else if (sys_unlink(f) != 0)
                 sys_write("ush: rm: no such file\n");
+            continue;
+        }
+        if (line[0] == 'k' && line[1] == 'i' && line[2] == 'l' &&
+            line[3] == 'l' && line[4] == ' ') {
+            char *a = trim(line + 5);
+            int pid = 0, ok = (*a != '\0');
+            for (int i = 0; a[i]; i++) {
+                if (a[i] < '0' || a[i] > '9') {
+                    ok = 0;
+                    break;
+                }
+                pid = pid * 10 + (a[i] - '0');
+            }
+            if (!ok)
+                sys_write("ush: usage: kill <pid>\n");
+            else if (sys_kill(pid) != 0)
+                sys_write("ush: kill: no such task\n");
             continue;
         }
 
