@@ -28,6 +28,8 @@
 #define SYS_SPAWN_IO 13 /* ebx = cmdline, ecx = stdin fd, edx = stdout fd
                          * (-1 = console); background; returns pid or -1 */
 #define SYS_TIME 14     /* ebx = struct systime* (user, writable) */
+#define SYS_CREATE 15   /* ebx = name; create/truncate a ramfs file for
+                         * writing; returns fd or -1 */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct systime {

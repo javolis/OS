@@ -72,10 +72,17 @@ static inline int sys_sysinfo(struct sysinfo *out) {
     return ret;
 }
 
-/* Open an initrd file read-only. Returns a file descriptor or -1. */
+/* Open a file (ramfs first, then read-only initrd). Returns an fd or -1. */
 static inline int sys_open(const char *name) {
     int ret;
     __asm__ volatile("int $0x80" : "=a"(ret) : "a"(8), "b"(name));
+    return ret;
+}
+
+/* Create or truncate a writable ramfs file. Returns a write fd or -1. */
+static inline int sys_create(const char *name) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(15), "b"(name));
     return ret;
 }
 
