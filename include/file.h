@@ -10,6 +10,8 @@ enum file_kind {
     FILE_PIPE_READ,   /* read end of a pipe */
     FILE_PIPE_WRITE,  /* write end of a pipe */
     FILE_RAMFS,       /* read/write view of a writable ramfs file */
+    FILE_NULL,        /* /dev/null: discard writes, read EOF */
+    FILE_ZERO,        /* /dev/zero: discard writes, read endless zeros */
 };
 
 struct pipe;
