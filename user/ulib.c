@@ -324,6 +324,7 @@ void uprintf(const char *fmt, ...) {
         }
     }
     va_end(ap);
-    *p = '\0';
-    sys_write(buf);
+    /* Write to fd 1, so uprintf honors redirection/pipes (when not
+     * redirected, fd 1 is the console - identical output). */
+    sys_writefd(1, buf, (int)(p - buf));
 }
