@@ -19,7 +19,8 @@ HDRS := $(wildcard include/*.h)
 # initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/crash.elf user/echo.elf user/greet.elf user/runner.elf \
-             user/ush.elf user/sysinfo.elf user/exitcode.elf
+             user/ush.elf user/sysinfo.elf user/exitcode.elf user/cat.elf
+INITRD_FILES := $(USER_ELFS) user/notes.txt
 INITRD    := initrd.tar
 
 .PHONY: all iso run test clean
@@ -41,8 +42,8 @@ user/%.o: user/%.c user/usys.h user/ulib.h
 user/%.elf: user/%.o user/ulib.o user/user.ld
 	$(LD) -ffreestanding -O2 -nostdlib -T user/user.ld -o $@ $< user/ulib.o -lgcc
 
-$(INITRD): $(USER_ELFS)
-	tar --format=ustar -cf $@ -C user $(notdir $(USER_ELFS))
+$(INITRD): $(INITRD_FILES)
+	tar --format=ustar -cf $@ -C user $(notdir $(INITRD_FILES))
 
 iso: $(KERNEL) $(INITRD)
 	mkdir -p isodir/boot/grub

@@ -1,0 +1,3 @@
+The initrd now holds plain files alongside the executables.
+cat.elf streams them to stdout through file descriptors.
+Next stop: pipes.

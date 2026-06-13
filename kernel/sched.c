@@ -13,6 +13,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "file.h"
 #include "gdt.h"
 #include "io.h"
 #include "kheap.h"
@@ -48,6 +49,7 @@ struct task {
     uint32_t parent_pid; /* spawner; foreground reverts here on exit */
     uint32_t exit_code;  /* valid once ZOMBIE; (uint32_t)-1 when killed */
     char name[16];       /* argv[0], for ps */
+    struct file *fds[MAX_FDS]; /* 0 = stdin, 1 = stdout */
 };
 
 static struct task tasks[MAX_TASKS]; /* slot 0 = boot/idle task */
@@ -118,6 +120,12 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     t->user_esp = user_esp;
     t->parent_pid = current->pid;
     copy_name(t->name, name);
+    for (int i = 0; i < MAX_FDS; i++)
+        t->fds[i] = NULL;
+    t->fds[0] = file_console();
+    file_ref(t->fds[0]);
+    t->fds[1] = file_console();
+    file_ref(t->fds[1]);
     uint32_t pf = irq_save();
     t->pid = next_pid++;
     irq_restore(pf);
@@ -256,6 +264,8 @@ static void wake_waiters(uint32_t pid) {
  * shell's reaper and a waiting parent may race), then free its resources
  * from copied fields so a concurrent spawner reusing the slot is safe. */
 static int reap_slot(struct task *t, uint32_t *code_out) {
+    struct file *fds[MAX_FDS];
+
     uint32_t f = irq_save();
     if (t->state != TASK_ZOMBIE) {
         irq_restore(f);
@@ -265,8 +275,11 @@ static int reap_slot(struct task *t, uint32_t *code_out) {
     uint32_t pd = t->pd_phys;
     uint8_t *ks = t->kstack;
     uint32_t code = t->exit_code;
+    for (int i = 0; i < MAX_FDS; i++)
+        fds[i] = t->fds[i];
     irq_restore(f);
 
+    file_close_all(fds, MAX_FDS);
     paging_destroy_address_space(pd);
     kfree(ks);
     if (code_out)
@@ -324,6 +337,30 @@ int sched_pid_alive(uint32_t pid) {
 
 uint32_t sched_current_pid(void) {
     return current->pid;
+}
+
+struct file *sched_get_fd(int fd) {
+    if (fd < 0 || fd >= MAX_FDS)
+        return NULL;
+    return current->fds[fd];
+}
+
+int sched_install_fd(struct file *f) {
+    uint32_t fl = irq_save();
+    for (int i = 0; i < MAX_FDS; i++) {
+        if (!current->fds[i]) {
+            current->fds[i] = f;
+            irq_restore(fl);
+            return i;
+        }
+    }
+    irq_restore(fl);
+    return -1;
+}
+
+void sched_clear_fd(int fd) {
+    if (fd >= 0 && fd < MAX_FDS)
+        current->fds[fd] = NULL;
 }
 
 /* Kill a (non-running) user task by pid: marked zombie, never scheduled

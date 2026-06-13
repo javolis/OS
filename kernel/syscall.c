@@ -1,6 +1,7 @@
 /* syscall.c — int 0x80 system call dispatch. */
 #include <stdint.h>
 
+#include "file.h"
 #include "initrd.h"
 #include "keyboard.h"
 #include "kprintf.h"
@@ -37,18 +38,32 @@ static int user_string_ok(uint32_t addr) {
     return 0; /* no NUL within the cap */
 }
 
-/* Every page of [addr, addr+len) must be a present, writable, user page
- * in the caller's address space. */
-static int user_range_writable(uint32_t addr, uint32_t len) {
+/* Every page of [addr, addr+len) must be a present user page in the
+ * caller's address space — writable too when need_write is set. */
+static int user_range_ok(uint32_t addr, uint32_t len, int need_write) {
     if (len == 0 || addr + len < addr || addr + len > KERNEL_VIRT_BASE)
         return 0;
     uint32_t dir = paging_active_directory();
     for (uint32_t a = addr & ~0xFFFu; a < addr + len; a += 4096) {
         uint32_t pte = paging_get_pte(dir, a);
-        if (!(pte & 0x1) || !(pte & 0x2) || !(pte & 0x4))
-            return 0; /* present | writable | user */
+        if (!(pte & 0x1) || !(pte & 0x4))
+            return 0; /* present | user */
+        if (need_write && !(pte & 0x2))
+            return 0;
     }
     return 1;
+}
+
+#define user_range_writable(addr, len) user_range_ok(addr, len, 1)
+
+/* Raw byte write to the screen + serial, atomically. */
+static void console_write(const char *s, uint32_t n) {
+    uint32_t fl = irq_save();
+    for (uint32_t i = 0; i < n; i++) {
+        term_putchar(s[i]);
+        serial_putchar(s[i]);
+    }
+    irq_restore(fl);
 }
 
 /* Next keyboard character for a syscall context: blocks the TASK (not the
@@ -174,6 +189,96 @@ void syscall_handle(struct registers *regs) {
         uint32_t status;
         sched_wait_pid(regs->ebx, &status);
         regs->eax = status;
+        return;
+    }
+
+    case SYS_OPEN: {
+        if (!user_string_ok(regs->ebx)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        char name[64];
+        const char *src = (const char *)regs->ebx;
+        uint32_t n = 0;
+        while (src[n] && n + 1 < sizeof(name)) {
+            name[n] = src[n];
+            n++;
+        }
+        name[n] = '\0';
+
+        uint32_t size;
+        const void *data = initrd_find(name, &size);
+        if (!data) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct file *f = file_alloc(FILE_INITRD);
+        if (!f) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        f->data = data;
+        f->size = size;
+        int fd = sched_install_fd(f);
+        if (fd < 0)
+            file_unref(f);
+        regs->eax = (uint32_t)fd;
+        return;
+    }
+
+    case SYS_READ: {
+        struct file *f = sched_get_fd((int)regs->ebx);
+        uint32_t buf = regs->ecx, n = regs->edx;
+        if (!f || !user_range_writable(buf, n)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (f->kind == FILE_CONSOLE) {
+            /* One edited line; same foreground rule as SYS_READLINE. */
+            if (sched_current_pid() != sched_foreground_pid()) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+            regs->eax = do_readline((char *)buf, n);
+            return;
+        }
+        /* FILE_INITRD */
+        uint32_t left = f->size - f->offset;
+        uint32_t take = n < left ? n : left;
+        const uint8_t *src = f->data + f->offset;
+        uint8_t *dst = (uint8_t *)buf;
+        for (uint32_t i = 0; i < take; i++)
+            dst[i] = src[i];
+        f->offset += take;
+        regs->eax = take; /* 0 = EOF */
+        return;
+    }
+
+    case SYS_WRITEFD: {
+        struct file *f = sched_get_fd((int)regs->ebx);
+        uint32_t buf = regs->ecx, n = regs->edx;
+        if (!f || n > SYS_WRITE_MAX || !user_range_ok(buf, n, 0)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (f->kind != FILE_CONSOLE) {
+            regs->eax = (uint32_t)-1; /* initrd files are read-only */
+            return;
+        }
+        console_write((const char *)buf, n);
+        regs->eax = n;
+        return;
+    }
+
+    case SYS_CLOSE: {
+        struct file *f = sched_get_fd((int)regs->ebx);
+        if (!f) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        sched_clear_fd((int)regs->ebx);
+        file_unref(f);
+        regs->eax = 0;
         return;
     }
 

@@ -53,6 +53,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
+               r u n spc c a t dot e l f spc n o t e s dot t x t ret \
                r u n spc c l o c k dot e l f ret \
                ctrl-c \
                e c h o spc i n t a c t ret; do
@@ -281,6 +282,16 @@ if [ -n "$bye_line" ] && [ -n "$back_line" ] && [ "$bye_line" -lt "$back_line" ]
     echo "PASS: kernel shell regained the keyboard after ush exited"
 else
     echo "FAIL: kernel shell did not regain the keyboard" >&2
+    fail=1
+fi
+
+# File descriptors: cat.elf opens notes.txt from the initrd and streams
+# it to stdout in chunks.
+if grep -q "initrd now holds plain files" "$SERIAL_LOG" \
+        && grep -q "Next stop: pipes." "$SERIAL_LOG"; then
+    echo "PASS: cat read an initrd file through file descriptors"
+else
+    echo "FAIL: cat did not stream the initrd file" >&2
     fail=1
 fi
 
