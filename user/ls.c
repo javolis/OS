@@ -4,7 +4,8 @@
 
 void _start(void) {
     struct dirent e;
+    /* uprintf has no width specifiers, so format the columns plainly. */
     for (int i = 0; sys_readdir(i, &e) == 0; i++)
-        uprintf("%8u %c %s\n", e.size, e.kind ? 'w' : 'r', e.name);
+        uprintf("%u %c %s\n", e.size, e.kind ? 'w' : 'r', e.name);
     sys_exit(0);
 }
