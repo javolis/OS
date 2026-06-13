@@ -14,6 +14,38 @@ static int streq(const char *a, const char *b) {
     return *a == *b;
 }
 
+/* Trim leading/trailing spaces in place, returning the start. */
+static char *trim(char *s) {
+    while (*s == ' ')
+        s++;
+    int e = 0;
+    while (s[e])
+        e++;
+    while (e > 0 && s[e - 1] == ' ')
+        s[--e] = '\0';
+    return s;
+}
+
+/* Run "left | right": left's stdout and right's stdin share a pipe. ush
+ * drops both ends after spawning so the writer-closed EOF reaches right. */
+static void run_pipeline(char *left, char *right) {
+    int p[2];
+    if (sys_pipe(p) != 0) {
+        sys_write("ush: pipe failed\n");
+        return;
+    }
+    int pl = sys_spawn_io(left, -1, p[1]);  /* stdout -> pipe write */
+    int pr = sys_spawn_io(right, p[0], -1); /* stdin  <- pipe read */
+    sys_close(p[0]);
+    sys_close(p[1]);
+    if (pl < 0 || pr < 0) {
+        sys_write("ush: cannot run pipeline\n");
+        return;
+    }
+    sys_wait(pl);
+    sys_wait(pr);
+}
+
 void _start(void) {
     char line[96];
 
@@ -34,8 +66,27 @@ void _start(void) {
         }
         if (streq(line, "help")) {
             sys_write("ush builtins: help, exit\n"
-                      "anything else runs from the initrd: "
-                      "<file.elf> [args...] [&]\n");
+                      "run initrd programs: <file.elf> [args...] [&]\n"
+                      "pipelines: <a> | <b>\n");
+            continue;
+        }
+
+        /* A single '|' splits the line into a two-stage pipeline. */
+        int bar = -1;
+        for (int i = 0; i < n; i++) {
+            if (line[i] == '|') {
+                bar = i;
+                break;
+            }
+        }
+        if (bar >= 0) {
+            line[bar] = '\0';
+            char *left = trim(line);
+            char *right = trim(line + bar + 1);
+            if (*left && *right)
+                run_pipeline(left, right);
+            else
+                sys_write("ush: malformed pipeline\n");
             continue;
         }
 

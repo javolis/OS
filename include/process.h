@@ -7,6 +7,9 @@
  * on failure. The address space and kernel stack are reclaimed by
  * sched_reap() after the task exits. */
 /* foreground=1 hands the new process the keyboard atomically with it
- * becoming runnable (callers must own the foreground themselves). */
+ * becoming runnable (callers must own the foreground themselves).
+ * in/out become the child's fds 0/1 (NULL = the console). */
+struct file;
 int process_spawn(const char *image_start, const char *image_end,
-                  const char *cmdline, int foreground);
+                  const char *cmdline, int foreground, struct file *in,
+                  struct file *out);

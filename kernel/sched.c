@@ -29,9 +29,10 @@
 enum task_state {
     TASK_FREE = 0,
     TASK_READY,
-    TASK_BLOCKED, /* sleeping until wake_at */
-    TASK_WAITKBD, /* blocked on keyboard input */
-    TASK_WAITPID, /* blocked until wait_pid exits */
+    TASK_BLOCKED,  /* sleeping until wake_at */
+    TASK_WAITKBD,  /* blocked on keyboard input */
+    TASK_WAITPID,  /* blocked until wait_pid exits */
+    TASK_WAITCHAN, /* blocked on wait_chan (e.g. a pipe) */
     TASK_ZOMBIE,
 };
 
@@ -48,6 +49,7 @@ struct task {
     uint32_t wait_pid;   /* pid a WAITPID task is waiting on */
     uint32_t parent_pid; /* spawner; foreground reverts here on exit */
     uint32_t exit_code;  /* valid once ZOMBIE; (uint32_t)-1 when killed */
+    void *wait_chan;     /* what a WAITCHAN task is blocked on */
     char name[16];       /* argv[0], for ps */
     struct file *fds[MAX_FDS]; /* 0 = stdin, 1 = stdout */
 };
@@ -92,7 +94,8 @@ static void task_entry(void) {
 }
 
 int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
-                     int make_foreground, const char *name) {
+                     int make_foreground, const char *name,
+                     struct file *in, struct file *out) {
     /* Slot selection and pid assignment must not race with other spawners
      * (kernel shell with IF on vs. tasks inside the spawn syscall). */
     uint32_t flags = irq_save();
@@ -122,9 +125,10 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     copy_name(t->name, name);
     for (int i = 0; i < MAX_FDS; i++)
         t->fds[i] = NULL;
-    t->fds[0] = file_console();
+    /* stdin/stdout: the given files (e.g. pipe ends) or the console. */
+    t->fds[0] = in ? in : file_console();
     file_ref(t->fds[0]);
-    t->fds[1] = file_console();
+    t->fds[1] = out ? out : file_console();
     file_ref(t->fds[1]);
     uint32_t pf = irq_save();
     t->pid = next_pid++;
@@ -238,6 +242,21 @@ void sched_wake_keyboard(void) {
             tasks[i].state = TASK_READY;
 }
 
+/* Block the calling task on an opaque channel (syscall context; IF off, so
+ * the caller's empty/full check cannot race the waker). */
+void sched_block_on_chan(void *chan) {
+    current->wait_chan = chan;
+    current->state = TASK_WAITCHAN;
+    schedule();
+}
+
+/* Wake every task blocked on this channel. */
+void sched_wake_chan(void *chan) {
+    for (int i = 1; i < MAX_TASKS; i++)
+        if (tasks[i].state == TASK_WAITCHAN && tasks[i].wait_chan == chan)
+            tasks[i].state = TASK_READY;
+}
+
 void sched_set_foreground(uint32_t pid) {
     fg_pid = pid;
 }
@@ -315,22 +334,23 @@ uint32_t sched_foreground_pid(void) {
     return fg_pid;
 }
 
+/* True for any non-FREE, non-ZOMBIE task (i.e. still runnable or blocked). */
+static int state_alive(enum task_state s) {
+    return s == TASK_READY || s == TASK_BLOCKED || s == TASK_WAITKBD ||
+           s == TASK_WAITPID || s == TASK_WAITCHAN;
+}
+
 uint32_t sched_alive_count(void) {
     uint32_t n = 0;
     for (int i = 1; i < MAX_TASKS; i++)
-        if (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
-            tasks[i].state == TASK_WAITKBD ||
-            tasks[i].state == TASK_WAITPID)
+        if (state_alive(tasks[i].state))
             n++;
     return n;
 }
 
 int sched_pid_alive(uint32_t pid) {
     for (int i = 1; i < MAX_TASKS; i++)
-        if (tasks[i].pid == pid &&
-            (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
-             tasks[i].state == TASK_WAITKBD ||
-             tasks[i].state == TASK_WAITPID))
+        if (tasks[i].pid == pid && state_alive(tasks[i].state))
             return 1;
     return 0;
 }
@@ -368,10 +388,7 @@ void sched_clear_fd(int fd) {
  * the shell is the running task, so the target is always off-CPU. */
 int sched_kill(uint32_t pid) {
     for (int i = 1; i < MAX_TASKS; i++) {
-        if (tasks[i].pid == pid &&
-            (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
-             tasks[i].state == TASK_WAITKBD ||
-             tasks[i].state == TASK_WAITPID)) {
+        if (tasks[i].pid == pid && state_alive(tasks[i].state)) {
             tasks[i].exit_code = (uint32_t)-1; /* killed, not exited */
             tasks[i].state = TASK_ZOMBIE;
             wake_waiters(pid);
@@ -384,8 +401,9 @@ int sched_kill(uint32_t pid) {
 }
 
 void sched_ps(void) {
-    static const char *const names[] = {"free",    "ready",   "blocked",
-                                        "waitkbd", "waitpid", "zombie"};
+    static const char *const names[] = {"free",    "ready",    "blocked",
+                                        "waitkbd", "waitpid",  "waitchan",
+                                        "zombie"};
     kprintf("  PID  STATE    NAME\n");
     for (int i = 0; i < MAX_TASKS; i++) {
         if (i != 0 && tasks[i].state == TASK_FREE)
@@ -425,6 +443,10 @@ void task_exit(uint32_t code) {
     kprintf("[pid %lu] exited\n", current->pid);
     if (fg_pid == current->pid)
         fg_pid = current->parent_pid; /* keyboard back to the parent */
+    /* Release fds now, not at reap: a pipe's other end must see EOF as
+     * soon as we exit, even if our parent is slow to wait. (Killed tasks
+     * skip this and are cleaned up by reap_slot instead.) */
+    file_close_all(current->fds, MAX_FDS);
     current->exit_code = code;
     wake_waiters(current->pid);
     current->state = TASK_ZOMBIE;

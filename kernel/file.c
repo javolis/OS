@@ -7,6 +7,7 @@
 #include "file.h"
 #include "io.h"
 #include "kheap.h"
+#include "pipe.h"
 
 static struct file console = {
     .kind = FILE_CONSOLE,
@@ -26,6 +27,7 @@ struct file *file_alloc(int kind) {
     f->data = NULL;
     f->size = 0;
     f->offset = 0;
+    f->pipe = NULL;
     return f;
 }
 
@@ -39,8 +41,11 @@ void file_unref(struct file *f) {
     uint32_t fl = irq_save();
     int gone = (--f->refs == 0);
     irq_restore(fl);
-    if (gone)
+    if (gone) {
+        if (f->kind == FILE_PIPE_READ || f->kind == FILE_PIPE_WRITE)
+            pipe_close_end(f); /* may free the shared pipe */
         kfree(f);
+    }
 }
 
 void file_close_all(struct file **fds, int n) {

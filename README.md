@@ -33,11 +33,13 @@ reaped at the prompt; kprintf is interrupt-atomic so output lines never
 interleave; ps shows the task table with names; kill terminates a task
 by pid and Ctrl+C kills the foreground task). User code talks to the
 kernel via int 0x80 (write / exit / sleep / getpid / readline /
-spawn / wait / sysinfo / open / read / writefd / close — user programs
-can launch other programs, collect their exit codes via wait (which also
-reclaims the child), and stream initrd files through per-process file
-descriptors (cat.elf); ush.elf is a complete shell running in ring 3,
-with a tiny user libc providing uprintf); sleep blocks properly — the scheduler runs other tasks,
+spawn / wait / sysinfo / open / read / writefd / close / pipe / spawn_io
+— user programs can launch other programs, collect their exit codes via
+wait (which also reclaims the child), stream initrd files through
+per-process file descriptors (cat.elf), and connect through pipes;
+ush.elf is a complete shell running in ring 3 with `a | b` pipelines
+(e.g. cat notes.txt | upper) and a tiny user libc providing uprintf);
+sleep blocks properly — the scheduler runs other tasks,
 including the shell, until the wake tick. Faults are isolated: a ring-3
 exception kills only the offending task (text/rodata segments are mapped
 read-only per ELF flags, and syscalls validate user pointers), while

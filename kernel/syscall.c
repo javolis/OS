@@ -8,6 +8,7 @@
 #include "kprintf.h"
 #include "memlayout.h"
 #include "paging.h"
+#include "pipe.h"
 #include "pmm.h"
 #include "process.h"
 #include "sched.h"
@@ -109,6 +110,38 @@ static uint32_t do_readline(char *dst, uint32_t max) {
     return len;
 }
 
+/* Shared by SYS_SPAWN and SYS_SPAWN_IO: copy the cmdline from user space,
+ * resolve the program in the initrd, and spawn it with the given stdio.
+ * Returns the child pid or -1. */
+static int spawn_from_user(uint32_t cmdline_uaddr, int make_fg,
+                           struct file *in, struct file *out) {
+    if (!user_string_ok(cmdline_uaddr))
+        return -1;
+
+    char cmdline[SPAWN_CMDLINE_MAX];
+    const char *src = (const char *)cmdline_uaddr;
+    uint32_t n = 0;
+    while (src[n] && n + 1 < sizeof(cmdline)) {
+        cmdline[n] = src[n];
+        n++;
+    }
+    cmdline[n] = '\0';
+
+    char fname[32];
+    n = 0;
+    while (cmdline[n] && cmdline[n] != ' ' && n + 1 < sizeof(fname)) {
+        fname[n] = cmdline[n];
+        n++;
+    }
+    fname[n] = '\0';
+
+    uint32_t size;
+    const char *img = initrd_find(fname, &size);
+    if (!img)
+        return -1;
+    return process_spawn(img, img + size, cmdline, make_fg, in, out);
+}
+
 void syscall_handle(struct registers *regs) {
     switch (regs->eax) {
     case SYS_EXIT:
@@ -148,41 +181,62 @@ void syscall_handle(struct registers *regs) {
     }
 
     case SYS_SPAWN: {
-        if (!user_string_ok(regs->ebx)) {
-            regs->eax = (uint32_t)-1;
-            return;
-        }
-        /* Copy to a kernel buffer; the string lives in the caller's
-         * address space and process_spawn re-reads it repeatedly. */
-        char cmdline[SPAWN_CMDLINE_MAX];
-        const char *src = (const char *)regs->ebx;
-        uint32_t n = 0;
-        while (src[n] && n + 1 < sizeof(cmdline)) {
-            cmdline[n] = src[n];
-            n++;
-        }
-        cmdline[n] = '\0';
-
-        char fname[32];
-        n = 0;
-        while (cmdline[n] && cmdline[n] != ' ' && n + 1 < sizeof(fname)) {
-            fname[n] = cmdline[n];
-            n++;
-        }
-        fname[n] = '\0';
-
-        uint32_t size;
-        const char *img = initrd_find(fname, &size);
-        if (!img) {
-            regs->eax = (uint32_t)-1;
-            return;
-        }
         /* Foreground handoff happens inside spawn, atomically with the
          * child becoming runnable — it may run before we return. */
         int make_fg = (regs->ecx == 1 &&
                        sched_current_pid() == sched_foreground_pid());
-        regs->eax = (uint32_t)process_spawn(img, img + size, cmdline,
-                                            make_fg);
+        regs->eax = (uint32_t)spawn_from_user(regs->ebx, make_fg, NULL, NULL);
+        return;
+    }
+
+    case SYS_SPAWN_IO: {
+        /* ecx = stdin fd, edx = stdout fd in the CALLER's table (-1 =
+         * console). The child runs in the background. */
+        struct file *in = NULL, *out = NULL;
+        if ((int)regs->ecx >= 0) {
+            in = sched_get_fd((int)regs->ecx);
+            if (!in) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+        }
+        if ((int)regs->edx >= 0) {
+            out = sched_get_fd((int)regs->edx);
+            if (!out) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+        }
+        regs->eax = (uint32_t)spawn_from_user(regs->ebx, 0, in, out);
+        return;
+    }
+
+    case SYS_PIPE: {
+        if (!user_range_writable(regs->ebx, 2 * sizeof(int))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct file *rd, *wr;
+        if (pipe_create(&rd, &wr) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int rfd = sched_install_fd(rd);
+        int wfd = sched_install_fd(wr);
+        if (rfd < 0 || wfd < 0) {
+            if (rfd >= 0)
+                sched_clear_fd(rfd);
+            if (wfd >= 0)
+                sched_clear_fd(wfd);
+            file_unref(rd);
+            file_unref(wr);
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int *out = (int *)regs->ebx;
+        out[0] = rfd;
+        out[1] = wfd;
+        regs->eax = 0;
         return;
     }
 
@@ -243,6 +297,14 @@ void syscall_handle(struct registers *regs) {
             regs->eax = do_readline((char *)buf, n);
             return;
         }
+        if (f->kind == FILE_PIPE_READ) {
+            regs->eax = (uint32_t)pipe_read(f, (uint8_t *)buf, n);
+            return;
+        }
+        if (f->kind == FILE_PIPE_WRITE) {
+            regs->eax = (uint32_t)-1; /* wrong end */
+            return;
+        }
         /* FILE_INITRD */
         uint32_t left = f->size - f->offset;
         uint32_t take = n < left ? n : left;
@@ -262,8 +324,12 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1;
             return;
         }
+        if (f->kind == FILE_PIPE_WRITE) {
+            regs->eax = (uint32_t)pipe_write(f, (const uint8_t *)buf, n);
+            return;
+        }
         if (f->kind != FILE_CONSOLE) {
-            regs->eax = (uint32_t)-1; /* initrd files are read-only */
+            regs->eax = (uint32_t)-1; /* initrd read-only, pipe read end */
             return;
         }
         console_write((const char *)buf, n);

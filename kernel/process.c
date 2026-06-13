@@ -63,7 +63,8 @@ static uint32_t build_user_stack(uint8_t *stk, const char *cmdline) {
 }
 
 int process_spawn(const char *image_start, const char *image_end,
-                  const char *cmdline, int foreground) {
+                  const char *cmdline, int foreground, struct file *in,
+                  struct file *out) {
     uint32_t size = (uint32_t)(image_end - image_start);
 
     uint32_t dir = paging_new_address_space();
@@ -95,7 +96,8 @@ int process_spawn(const char *image_start, const char *image_end,
     }
     name[n] = '\0';
 
-    int pid = sched_spawn_user(dir, entry, user_esp, foreground, name);
+    int pid =
+        sched_spawn_user(dir, entry, user_esp, foreground, name, in, out);
     if (pid < 0) {
         paging_destroy_address_space(dir); /* frees segments + stack too */
         return -1;

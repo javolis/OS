@@ -122,8 +122,10 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
 
         uint32_t frames_before = pmm_free_frames();
         sched_init();
-        if (process_spawn(elf_a, elf_a + elf_a_size, "hello_a.elf", 0) < 0 ||
-            process_spawn(elf_b, elf_b + elf_b_size, "hello_b.elf", 0) < 0) {
+        if (process_spawn(elf_a, elf_a + elf_a_size, "hello_a.elf", 0, 0,
+                          0) < 0 ||
+            process_spawn(elf_b, elf_b + elf_b_size, "hello_b.elf", 0, 0,
+                          0) < 0) {
             kprintf("PANIC: could not spawn user processes\n");
             halt_forever();
         }
