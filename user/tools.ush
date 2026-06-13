@@ -1,0 +1,5 @@
+# tools.ush - coreutils capstone: compose filters in a real pipeline.
+# words.txt = pear/fig/pear/date/fig; sorted+uniq'd = date/fig/pear;
+# reversed = etad/gif/raep. 'raep' (pear reversed) appears nowhere else.
+cat.elf words.txt | sort.elf | uniq.elf | rev.elf
+echo.elf coreutils-capstone-done

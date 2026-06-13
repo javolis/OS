@@ -75,6 +75,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r u n t e s t s dot e l f ret \
                r u n spc d e v t e s t dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
+               r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -434,6 +435,18 @@ if grep -q "coretest: all ok" "$SERIAL_LOG"; then
     echo "PASS: coreutils filters behave"
 else
     echo "FAIL: a coreutils filter misbehaved" >&2
+    fail=1
+fi
+
+# Coreutils capstone: tools.ush runs cat words.txt | sort | uniq | rev.
+# 'raep' (pear reversed) appears in no input or command, so it proves the
+# four filters composed correctly through a real 4-stage pipeline; the
+# done marker confirms the script finished.
+if grep -q "^raep$" "$SERIAL_LOG" \
+        && grep -q "coreutils-capstone-done" "$SERIAL_LOG"; then
+    echo "PASS: coreutils compose in a multi-stage pipeline"
+else
+    echo "FAIL: coreutils capstone pipeline broke" >&2
     fail=1
 fi
 
