@@ -51,6 +51,7 @@ void _start(void) {
     check("grep.elf bet", "alpha\nbeta\ngamma\n", "beta\n", "grep");
     check("sort.elf", "banana\napple\ncherry\n", "apple\nbanana\ncherry\n",
           "sort");
+    check("uniq.elf", "a\na\nb\nb\nb\na\n", "a\nb\na\n", "uniq");
 
     if (failed == 0)
         uprintf("coretest: all ok (%d filters)\n", passed);
