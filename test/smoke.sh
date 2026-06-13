@@ -53,6 +53,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc u p p e r dot e l f spc shift-backslash spc u p p e r dot e l f ret \
                e m i t dot e l f spc shift-dot spc s dot t x t ret \
                c a t dot e l f spc shift-comma spc s dot t x t ret \
+               c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc w c dot e l f ret \
+               c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc h e a d dot e l f spc minus 1 spc shift-backslash spc w c dot e l f ret \
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
@@ -298,6 +300,22 @@ if grep -qE "date: [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}" "$SERI
     echo "PASS: RTC reported a well-formed timestamp"
 else
     echo "FAIL: date produced no valid timestamp" >&2
+    fail=1
+fi
+
+# Coreutils: 'cat notes.txt | wc' counts notes.txt's 3 lines; then
+# 'cat notes.txt | head -1 | wc' cuts to the first line (9 words). The
+# wc output format ('<lines> <words> <bytes>') makes both deterministic.
+if grep -qE "^3 [0-9]+ [0-9]+$" "$SERIAL_LOG"; then
+    echo "PASS: wc counted piped input (3 lines)"
+else
+    echo "FAIL: wc did not report 3 lines" >&2
+    fail=1
+fi
+if grep -qE "^1 9 [0-9]+$" "$SERIAL_LOG"; then
+    echo "PASS: head limited the stream (cat | head -1 | wc = 1 line)"
+else
+    echo "FAIL: head did not limit to one line" >&2
     fail=1
 fi
 
