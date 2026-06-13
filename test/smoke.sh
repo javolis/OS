@@ -51,6 +51,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc u s h dot e l f ret \
                e c h o dot e l f spc h i spc f r o m spc u s h ret \
                c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc u p p e r dot e l f spc shift-backslash spc u p p e r dot e l f ret \
+               e m i t dot e l f spc shift-dot spc s dot t x t ret \
+               c a t dot e l f spc shift-comma spc s dot t x t ret \
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
@@ -296,6 +298,17 @@ if grep -qE "date: [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}" "$SERI
     echo "PASS: RTC reported a well-formed timestamp"
 else
     echo "FAIL: date produced no valid timestamp" >&2
+    fail=1
+fi
+
+# Redirection inside ush: 'emit.elf > s.txt' sends the sentinel to a file
+# (NOT the console), then 'cat.elf < s.txt' reads it back to the console.
+# The sentinel never appears in any typed command, so its presence proves
+# both > (create+write) and < (open+read) moved data through the file.
+if grep -q "redirect-sentinel-ok" "$SERIAL_LOG"; then
+    echo "PASS: ush redirection > and < round-tripped a file"
+else
+    echo "FAIL: redirection did not move data through a file" >&2
     fail=1
 fi
 
