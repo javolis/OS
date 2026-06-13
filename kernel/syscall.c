@@ -120,11 +120,52 @@ static char task_getchar(void) {
     }
 }
 
-/* Line-disciplined read into a user buffer: echo, backspace editing,
- * returns on Enter. The caller's address space is active, so the buffer
- * is written through its own user mapping. */
+/* Line-input history, shared by all console reads (so ush gets up/down
+ * recall). A small ring shifted on overflow; oldest first. */
+#define HIST_N 8
+#define HIST_LEN 128
+static char hist[HIST_N][HIST_LEN];
+static int hist_len;
+
+static void hist_add(const char *s) {
+    if (s[0] == '\0')
+        return;
+    if (hist_len > 0 && names_match(hist[hist_len - 1], s))
+        return; /* skip consecutive duplicate */
+    if (hist_len == HIST_N) {
+        for (int i = 1; i < HIST_N; i++) {
+            int j = 0;
+            while (hist[i][j]) {
+                hist[i - 1][j] = hist[i][j];
+                j++;
+            }
+            hist[i - 1][j] = '\0';
+        }
+        hist_len--;
+    }
+    int j = 0;
+    while (s[j] && j < HIST_LEN - 1) {
+        hist[hist_len][j] = s[j];
+        j++;
+    }
+    hist[hist_len][j] = '\0';
+    hist_len++;
+}
+
+/* Erase `n` echoed chars from the screen and a serial terminal. */
+static void erase_echoed(uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) {
+        term_putchar('\b');
+        serial_write("\b \b");
+    }
+}
+
+/* Line-disciplined read into a user buffer: echo, backspace editing, and
+ * up/down history recall; returns on Enter. The caller's address space is
+ * active, so the buffer is written through its own user mapping. */
 static uint32_t do_readline(char *dst, uint32_t max) {
     uint32_t len = 0;
+    int hpos = hist_len; /* == hist_len means the fresh, un-recalled line */
     for (;;) {
         char c = task_getchar();
         if (c == '\n') {
@@ -139,14 +180,37 @@ static uint32_t do_readline(char *dst, uint32_t max) {
             }
             continue;
         }
+        if (c == KEY_UP || c == KEY_DOWN) {
+            if (c == KEY_UP) {
+                if (hpos == 0)
+                    continue;
+                hpos--;
+            } else {
+                if (hpos == hist_len)
+                    continue;
+                hpos++;
+            }
+            erase_echoed(len);
+            len = 0;
+            if (hpos < hist_len) { /* recall an entry */
+                const char *h = hist[hpos];
+                while (h[len] && len + 1 < max) {
+                    dst[len] = h[len];
+                    kprintf("%c", h[len]);
+                    len++;
+                }
+            }
+            continue;
+        }
         if ((unsigned char)c >= 0x80)
-            continue; /* arrows etc.: no history in user readline yet */
+            continue; /* other non-printing keys */
         if (len + 1 < max) {
             dst[len++] = c;
             kprintf("%c", c);
         }
     }
     dst[len] = '\0';
+    hist_add(dst);
     return len;
 }
 
