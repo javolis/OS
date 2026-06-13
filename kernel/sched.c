@@ -18,6 +18,7 @@
 #include "io.h"
 #include "kheap.h"
 #include "kprintf.h"
+#include "memlayout.h"
 #include "paging.h"
 #include "sched.h"
 #include "timer.h"
@@ -50,6 +51,8 @@ struct task {
     uint32_t parent_pid; /* spawner; foreground reverts here on exit */
     uint32_t exit_code;  /* valid once ZOMBIE; (uint32_t)-1 when killed */
     void *wait_chan;     /* what a WAITCHAN task is blocked on */
+    uint32_t brk;        /* user heap break (SYS_SBRK) */
+    uint32_t brk_top;    /* page-aligned ceiling of mapped heap pages */
     char name[16];       /* argv[0], for ps */
     struct file *fds[MAX_FDS]; /* 0 = stdin, 1 = stdout */
 };
@@ -122,6 +125,8 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     t->user_eip = user_eip;
     t->user_esp = user_esp;
     t->parent_pid = current->pid;
+    t->brk = USER_HEAP_BASE;
+    t->brk_top = USER_HEAP_BASE;
     copy_name(t->name, name);
     for (int i = 0; i < MAX_FDS; i++)
         t->fds[i] = NULL;
@@ -357,6 +362,17 @@ int sched_pid_alive(uint32_t pid) {
 
 uint32_t sched_current_pid(void) {
     return current->pid;
+}
+
+uint32_t sched_brk(void) {
+    return current->brk;
+}
+uint32_t sched_brk_top(void) {
+    return current->brk_top;
+}
+void sched_set_brk(uint32_t brk, uint32_t top) {
+    current->brk = brk;
+    current->brk_top = top;
 }
 
 struct file *sched_get_fd(int fd) {
