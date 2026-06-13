@@ -326,6 +326,44 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_APPEND: {
+        char name[RAMFS_NAME_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        /* Open the existing file (preserving contents) or create it. */
+        struct ramfs_file *rf = ramfs_find(name);
+        if (!rf)
+            rf = ramfs_create(name);
+        if (!rf) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct file *f = file_alloc(FILE_RAMFS);
+        if (!f) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        f->rfile = rf;
+        f->offset = rf->size; /* writes land at end-of-file */
+        int fd = sched_install_fd(f);
+        if (fd < 0)
+            file_unref(f);
+        regs->eax = (uint32_t)fd;
+        return;
+    }
+
+    case SYS_UNLINK: {
+        char name[RAMFS_NAME_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)ramfs_unlink(name);
+        return;
+    }
+
     case SYS_READ: {
         struct file *f = sched_get_fd((int)regs->ebx);
         uint32_t buf = regs->ecx, n = regs->edx;

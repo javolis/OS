@@ -64,6 +64,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                e c h o spc i n t a c t ret \
                r u n spc d a t e dot e l f ret \
                r u n spc r a m t e s t dot e l f ret \
+               r u n spc a p p e n d t e s t dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -336,6 +337,15 @@ if grep -q "ramtest: ramfs round-trip works" "$SERIAL_LOG"; then
     echo "PASS: ramfs create/write/read round-trip"
 else
     echo "FAIL: ramfs round-trip did not work" >&2
+    fail=1
+fi
+
+# Append + unlink: create+write, append, read back 'A\nB\n', then unlink
+# and confirm the reopen fails. All in one self-contained program.
+if grep -q "appendtest: append+unlink ok" "$SERIAL_LOG"; then
+    echo "PASS: ramfs append and unlink"
+else
+    echo "FAIL: append or unlink misbehaved" >&2
     fail=1
 fi
 

@@ -30,6 +30,9 @@
 #define SYS_TIME 14     /* ebx = struct systime* (user, writable) */
 #define SYS_CREATE 15   /* ebx = name; create/truncate a ramfs file for
                          * writing; returns fd or -1 */
+#define SYS_APPEND 16   /* ebx = name; open (or create) a ramfs file with
+                         * the write offset at end-of-file; returns fd/-1 */
+#define SYS_UNLINK 17   /* ebx = name; remove a ramfs file; 0 or -1 */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct systime {

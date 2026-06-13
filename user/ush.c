@@ -26,12 +26,15 @@ static char *trim(char *s) {
     return s;
 }
 
-/* Strip '< in' and '> out' redirections from cmd in place, setting the
- * infile and outfile outputs to the filenames (NULL if absent). Returns
- * 0, or -1 if a redirection operator has no filename. */
-static int parse_redir(char *cmd, char **infile, char **outfile) {
+/* Strip '< in', '> out', and '>> out' redirections from cmd in place,
+ * setting the infile and outfile outputs to the filenames (NULL if
+ * absent) and *append to 1 for '>>'. Returns 0, or -1 if a redirection
+ * operator has no filename. */
+static int parse_redir(char *cmd, char **infile, char **outfile,
+                       int *append) {
     *infile = 0;
     *outfile = 0;
+    *append = 0;
 
     int i = 0;
     while (cmd[i] && cmd[i] != '<' && cmd[i] != '>')
@@ -47,6 +50,11 @@ static int parse_redir(char *cmd, char **infile, char **outfile) {
             continue;
         }
         i++;
+        int is_append = 0;
+        if (op == '>' && cmd[i] == '>') { /* '>>' append */
+            is_append = 1;
+            i++;
+        }
         while (cmd[i] == ' ')
             i++;
         if (!cmd[i])
@@ -56,10 +64,12 @@ static int parse_redir(char *cmd, char **infile, char **outfile) {
             i++;
         if (cmd[i])
             cmd[i++] = '\0';
-        if (op == '<')
+        if (op == '<') {
             *infile = name;
-        else
+        } else {
             *outfile = name;
+            *append = is_append;
+        }
     }
     cmd[cmd_end] = '\0'; /* truncate the command before the first operator */
     return 0;
@@ -123,10 +133,18 @@ void _start(void) {
             sys_exit(0);
         }
         if (streq(line, "help")) {
-            sys_write("ush builtins: help, exit\n"
+            sys_write("ush builtins: help, exit, rm <file>\n"
                       "run: <file.elf> [args...] [&]\n"
                       "pipelines: <a> | <b> | <c> ...\n"
-                      "redirection: <cmd> > out, <cmd> < in\n");
+                      "redirection: <cmd> > out, >> out (append), < in\n");
+            continue;
+        }
+        if (line[0] == 'r' && line[1] == 'm' && line[2] == ' ') {
+            char *f = trim(line + 3);
+            if (*f == '\0')
+                sys_write("ush: rm needs a filename\n");
+            else if (sys_unlink(f) != 0)
+                sys_write("ush: rm: no such file\n");
             continue;
         }
 
@@ -186,9 +204,10 @@ void _start(void) {
         if (end == 0)
             continue;
 
-        /* Redirection: '> out' (ramfs create) and '< in' (open). */
+        /* Redirection: '> out', '>> out' (append), and '< in'. */
         char *infile, *outfile;
-        if (parse_redir(line, &infile, &outfile) != 0) {
+        int append;
+        if (parse_redir(line, &infile, &outfile, &append) != 0) {
             sys_write("ush: redirection needs a filename\n");
             continue;
         }
@@ -206,7 +225,8 @@ void _start(void) {
                 }
             }
             if (outfile) {
-                outfd = sys_create(trim(outfile));
+                char *o = trim(outfile);
+                outfd = append ? sys_append(o) : sys_create(o);
                 if (outfd < 0) {
                     sys_write("ush: cannot create output file\n");
                     if (infd >= 0)
