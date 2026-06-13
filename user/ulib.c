@@ -19,6 +19,99 @@ int ustreq(const char *a, const char *b) {
     return *a == *b;
 }
 
+void *umemset(void *dst, int c, uint32_t n) {
+    uint8_t *d = dst;
+    for (uint32_t i = 0; i < n; i++)
+        d[i] = (uint8_t)c;
+    return dst;
+}
+
+void *umemcpy(void *dst, const void *src, uint32_t n) {
+    uint8_t *d = dst;
+    const uint8_t *s = src;
+    for (uint32_t i = 0; i < n; i++)
+        d[i] = s[i];
+    return dst;
+}
+
+void *umemmove(void *dst, const void *src, uint32_t n) {
+    uint8_t *d = dst;
+    const uint8_t *s = src;
+    if (d < s) {
+        for (uint32_t i = 0; i < n; i++)
+            d[i] = s[i];
+    } else {
+        for (uint32_t i = n; i > 0; i--)
+            d[i - 1] = s[i - 1];
+    }
+    return dst;
+}
+
+int ustrcmp(const char *a, const char *b) {
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return (int)(unsigned char)*a - (int)(unsigned char)*b;
+}
+
+int ustrncmp(const char *a, const char *b, uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) {
+        if (a[i] != b[i])
+            return (int)(unsigned char)a[i] - (int)(unsigned char)b[i];
+        if (a[i] == '\0')
+            return 0;
+    }
+    return 0;
+}
+
+char *ustrcpy(char *dst, const char *src) {
+    char *d = dst;
+    while ((*d++ = *src++))
+        ;
+    return dst;
+}
+
+char *ustrncpy(char *dst, const char *src, uint32_t n) {
+    uint32_t i = 0;
+    for (; i < n && src[i]; i++)
+        dst[i] = src[i];
+    for (; i < n; i++)
+        dst[i] = '\0';
+    return dst;
+}
+
+char *ustrcat(char *dst, const char *src) {
+    char *d = dst;
+    while (*d)
+        d++;
+    while ((*d++ = *src++))
+        ;
+    return dst;
+}
+
+char *ustrchr(const char *s, int c) {
+    for (; *s; s++)
+        if (*s == (char)c)
+            return (char *)s;
+    return (c == '\0') ? (char *)s : 0;
+}
+
+int uatoi(const char *s) {
+    int sign = 1, v = 0;
+    while (*s == ' ')
+        s++;
+    if (*s == '-') {
+        sign = -1;
+        s++;
+    } else if (*s == '+') {
+        s++;
+    }
+    while (*s >= '0' && *s <= '9')
+        v = v * 10 + (*s++ - '0');
+    return sign * v;
+}
+
 static char *emit_uint(char *p, const char *end, uint32_t v, uint32_t base) {
     char tmp[12];
     int n = 0;
