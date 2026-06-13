@@ -26,3 +26,16 @@ void uprintf(const char *fmt, ...);
 /* Heap allocator over sys_sbrk: a first-fit free list with split/coalesce. */
 void *umalloc(uint32_t size); /* NULL on exhaustion or size 0 */
 void ufree(void *ptr);        /* NULL is a no-op */
+
+/* stdio-lite. Console output goes to fd 1; line input from fd 0. */
+void uputc(char c);
+void uputs(const char *s); /* writes s then a newline */
+int ugetline(char *buf, int n); /* one edited stdin line; length or -1 */
+
+/* Buffered file reader over the fd layer. */
+struct ufile;
+struct ufile *ufopen(const char *name); /* read-only; NULL on failure */
+int ufgetc(struct ufile *f);            /* next byte, or -1 at EOF */
+char *ufgets(char *s, int n, struct ufile *f); /* a line (keeps '\n'); NULL
+                                                * at EOF with nothing read */
+void ufclose(struct ufile *f);
