@@ -53,6 +53,7 @@ void _start(void) {
           "sort");
     check("uniq.elf", "a\na\nb\nb\nb\na\n", "a\nb\na\n", "uniq");
     check("nl.elf", "x\ny\nz\n", "1\tx\n2\ty\n3\tz\n", "nl");
+    check("rev.elf", "abc\nxy\n", "cba\nyx\n", "rev");
 
     /* tee: passthrough on stdout AND a copy left in the named file. */
     {
