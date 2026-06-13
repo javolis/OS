@@ -103,3 +103,20 @@ static inline int sys_close(int fd) {
     __asm__ volatile("int $0x80" : "=a"(ret) : "a"(11), "b"(fd));
     return ret;
 }
+
+/* Create a pipe: fds[0] = read end, fds[1] = write end. Returns 0 or -1. */
+static inline int sys_pipe(int fds[2]) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(12), "b"(fds) : "memory");
+    return ret;
+}
+
+/* Spawn a background program with its stdin/stdout wired to the given fds
+ * of the calling process (-1 = console). Returns the child pid or -1. */
+static inline int sys_spawn_io(const char *cmdline, int in_fd, int out_fd) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(13), "b"(cmdline), "c"(in_fd), "d"(out_fd));
+    return ret;
+}

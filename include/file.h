@@ -7,7 +7,11 @@
 enum file_kind {
     FILE_CONSOLE = 1, /* keyboard in / screen+serial out */
     FILE_INITRD,      /* read-only view of an initrd file */
+    FILE_PIPE_READ,   /* read end of a pipe */
+    FILE_PIPE_WRITE,  /* write end of a pipe */
 };
+
+struct pipe;
 
 struct file {
     int kind;
@@ -15,6 +19,7 @@ struct file {
     const uint8_t *data; /* FILE_INITRD */
     uint32_t size;
     uint32_t offset;
+    struct pipe *pipe; /* FILE_PIPE_* */
 };
 
 /* The shared console object (fds 0/1 of every process). Never freed: its

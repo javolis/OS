@@ -2,14 +2,18 @@
 #pragma once
 #include <stdint.h>
 
+struct file;
+
 void sched_init(void);
 
 /* Register a user task: it first runs by ireting to user_eip:user_esp in
  * the given address space, on its own kernel stack. make_foreground hands
  * it the keyboard atomically with becoming runnable; name (argv[0]) is
- * kept for ps. Returns pid or -1. */
+ * kept for ps; in/out become fds 0/1 (NULL = the console). Returns pid
+ * or -1. */
 int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
-                     int make_foreground, const char *name);
+                     int make_foreground, const char *name,
+                     struct file *in, struct file *out);
 
 void sched_start(void); /* enable timer-driven preemption */
 void sched_stop(void);
@@ -26,6 +30,10 @@ void sched_sleep_current(uint32_t nticks);
 
 /* Block the calling task until keyboard input arrives (syscall context). */
 void sched_block_on_keyboard(void);
+
+/* Block on / wake an opaque channel — pipes, and future blocking objects. */
+void sched_block_on_chan(void *chan);
+void sched_wake_chan(void *chan);
 
 /* Block the calling task until `pid` exits, then collect its exit status
  * and reclaim it (syscall context). *status_out = (uint32_t)-1 if the pid

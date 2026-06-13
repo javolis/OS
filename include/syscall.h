@@ -22,8 +22,11 @@
 #define SYS_OPEN 8     /* ebx = initrd file name; returns fd or -1 */
 #define SYS_READ 9     /* ebx = fd, ecx = buf, edx = n; returns bytes read,
                         * 0 at EOF (console: one edited line, fg only) */
-#define SYS_WRITEFD 10 /* ebx = fd, ecx = buf, edx = n; returns n or -1 */
-#define SYS_CLOSE 11   /* ebx = fd */
+#define SYS_WRITEFD 10  /* ebx = fd, ecx = buf, edx = n; returns n or -1 */
+#define SYS_CLOSE 11    /* ebx = fd */
+#define SYS_PIPE 12     /* ebx = int[2]; fills {read fd, write fd} */
+#define SYS_SPAWN_IO 13 /* ebx = cmdline, ecx = stdin fd, edx = stdout fd
+                         * (-1 = console); background; returns pid or -1 */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct sysinfo {

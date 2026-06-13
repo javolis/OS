@@ -19,7 +19,8 @@ HDRS := $(wildcard include/*.h)
 # initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/crash.elf user/echo.elf user/greet.elf user/runner.elf \
-             user/ush.elf user/sysinfo.elf user/exitcode.elf user/cat.elf
+             user/ush.elf user/sysinfo.elf user/exitcode.elf user/cat.elf \
+             user/upper.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt
 INITRD    := initrd.tar
 
