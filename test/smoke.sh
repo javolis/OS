@@ -55,6 +55,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                c a t dot e l f spc shift-comma spc s dot t x t ret \
                c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc w c dot e l f ret \
                c a t dot e l f spc n o t e s dot t x t spc shift-backslash spc h e a d dot e l f spc minus 1 spc shift-backslash spc w c dot e l f ret \
+               s e t spc x equal w o r k e d ret \
+               e c h o dot e l f spc v a r minus shift-4 x ret \
                e x i t ret \
                e c h o spc b a c k ret \
                r u n spc s y s i n f o dot e l f ret \
@@ -301,6 +303,16 @@ if grep -qE "date: [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}" "$SERI
     echo "PASS: RTC reported a well-formed timestamp"
 else
     echo "FAIL: date produced no valid timestamp" >&2
+    fail=1
+fi
+
+# Shell variables: 'set x=worked' then 'echo.elf var-$x'. The expanded
+# token 'var-worked' appears in no typed command (the set line has
+# 'worked', the echo line has 'var-$x'), so it proves $-expansion ran.
+if grep -q "var-worked" "$SERIAL_LOG"; then
+    echo "PASS: ush expanded a shell variable"
+else
+    echo "FAIL: shell variable not expanded" >&2
     fail=1
 fi
 
