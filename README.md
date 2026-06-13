@@ -40,8 +40,8 @@ through per-process file descriptors (cat.elf), connect through pipes,
 read/write a small in-RAM filesystem (ramfs, alongside the read-only
 initrd), and read the wall clock from the CMOS RTC (date.elf); ush.elf is a
 complete shell running in ring 3 with multi-stage `a | b | c` pipelines and
-`>` / `<` file redirection and a tiny user libc providing uprintf); sleep
-blocks properly — the scheduler runs other tasks,
+`>` / `>>` / `<` file redirection, an `rm` builtin, and a tiny user libc
+providing uprintf); sleep blocks properly — the scheduler runs other tasks,
 including the shell, until the wake tick. Faults are isolated: a ring-3
 exception kills only the offending task (text/rodata segments are mapped
 read-only per ELF flags, and syscalls validate user pointers), while

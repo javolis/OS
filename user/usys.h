@@ -86,6 +86,20 @@ static inline int sys_create(const char *name) {
     return ret;
 }
 
+/* Open (or create) a ramfs file for appending. Returns a write fd or -1. */
+static inline int sys_append(const char *name) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(16), "b"(name));
+    return ret;
+}
+
+/* Remove a ramfs file. Returns 0 or -1. */
+static inline int sys_unlink(const char *name) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(17), "b"(name));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;
