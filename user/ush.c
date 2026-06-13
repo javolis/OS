@@ -26,9 +26,9 @@ static char *trim(char *s) {
     return s;
 }
 
-/* Strip '< in' and '> out' redirections from cmd in place, setting
- * *infile/*outfile to the filenames (NULL if absent). Returns 0, or -1 if
- * a redirection operator has no filename. */
+/* Strip '< in' and '> out' redirections from cmd in place, setting the
+ * infile and outfile outputs to the filenames (NULL if absent). Returns
+ * 0, or -1 if a redirection operator has no filename. */
 static int parse_redir(char *cmd, char **infile, char **outfile) {
     *infile = 0;
     *outfile = 0;

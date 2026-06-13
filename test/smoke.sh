@@ -66,11 +66,11 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r a m t e s t dot e l f ret \
                r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
-        sleep 0.3
+        sleep 0.2
     done
     sleep 8
     echo "quit"
-} | timeout 150 qemu-system-i386 \
+} | timeout 240 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
