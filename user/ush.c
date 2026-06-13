@@ -26,6 +26,45 @@ static char *trim(char *s) {
     return s;
 }
 
+/* Strip '< in' and '> out' redirections from cmd in place, setting
+ * *infile/*outfile to the filenames (NULL if absent). Returns 0, or -1 if
+ * a redirection operator has no filename. */
+static int parse_redir(char *cmd, char **infile, char **outfile) {
+    *infile = 0;
+    *outfile = 0;
+
+    int i = 0;
+    while (cmd[i] && cmd[i] != '<' && cmd[i] != '>')
+        i++;
+    int cmd_end = i;
+    if (!cmd[i])
+        return 0; /* no redirection */
+
+    while (cmd[i]) {
+        char op = cmd[i];
+        if (op != '<' && op != '>') {
+            i++;
+            continue;
+        }
+        i++;
+        while (cmd[i] == ' ')
+            i++;
+        if (!cmd[i])
+            return -1; /* operator with no target */
+        char *name = &cmd[i];
+        while (cmd[i] && cmd[i] != ' ' && cmd[i] != '<' && cmd[i] != '>')
+            i++;
+        if (cmd[i])
+            cmd[i++] = '\0';
+        if (op == '<')
+            *infile = name;
+        else
+            *outfile = name;
+    }
+    cmd[cmd_end] = '\0'; /* truncate the command before the first operator */
+    return 0;
+}
+
 /* Up to 4 stages: each boundary needs a pipe (2 fds) open in ush at once,
  * and ush's 8-slot table already spends 2 on the console. */
 #define MAX_STAGES 4
@@ -85,8 +124,9 @@ void _start(void) {
         }
         if (streq(line, "help")) {
             sys_write("ush builtins: help, exit\n"
-                      "run initrd programs: <file.elf> [args...] [&]\n"
-                      "pipelines: <a> | <b> | <c> ...\n");
+                      "run: <file.elf> [args...] [&]\n"
+                      "pipelines: <a> | <b> | <c> ...\n"
+                      "redirection: <cmd> > out, <cmd> < in\n");
             continue;
         }
 
@@ -146,10 +186,50 @@ void _start(void) {
         if (end == 0)
             continue;
 
-        int pid = bg ? sys_spawn(line) : sys_spawn_fg(line);
+        /* Redirection: '> out' (ramfs create) and '< in' (open). */
+        char *infile, *outfile;
+        if (parse_redir(line, &infile, &outfile) != 0) {
+            sys_write("ush: redirection needs a filename\n");
+            continue;
+        }
+        char *cmd0 = trim(line);
+        if (*cmd0 == '\0')
+            continue;
+
+        if (infile || outfile) {
+            int infd = -1, outfd = -1;
+            if (infile) {
+                infd = sys_open(trim(infile));
+                if (infd < 0) {
+                    sys_write("ush: cannot open input file\n");
+                    continue;
+                }
+            }
+            if (outfile) {
+                outfd = sys_create(trim(outfile));
+                if (outfd < 0) {
+                    sys_write("ush: cannot create output file\n");
+                    if (infd >= 0)
+                        sys_close(infd);
+                    continue;
+                }
+            }
+            int pid = sys_spawn_io(cmd0, infd, outfd);
+            if (infd >= 0)
+                sys_close(infd);
+            if (outfd >= 0)
+                sys_close(outfd);
+            if (pid < 0)
+                sys_write("ush: cannot run redirected command\n");
+            else if (!bg)
+                sys_wait(pid);
+            continue;
+        }
+
+        int pid = bg ? sys_spawn(cmd0) : sys_spawn_fg(cmd0);
         if (pid < 0) {
             sys_write("ush: cannot run: ");
-            sys_write(line);
+            sys_write(cmd0);
             sys_write("\n");
             continue;
         }
