@@ -61,6 +61,28 @@ static int user_range_ok(uint32_t addr, uint32_t len, int need_write) {
 
 #define user_range_writable(addr, len) user_range_ok(addr, len, 1)
 
+static int names_match(const char *a, const char *b) {
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+/* If name is a device file, allocate and return its file object (refs=1);
+ * otherwise NULL. Shared by open/create/append so e.g. '> /dev/null'
+ * discards. */
+static struct file *try_dev_open(const char *name) {
+    int kind = 0;
+    if (names_match(name, "/dev/null"))
+        kind = FILE_NULL;
+    else if (names_match(name, "/dev/zero"))
+        kind = FILE_ZERO;
+    if (!kind)
+        return NULL;
+    return file_alloc(kind);
+}
+
 /* Copy a validated user filename into a kernel buffer. Returns 0 on
  * success, -1 if the pointer is bad. */
 static int copy_user_name(uint32_t addr, char *dst, uint32_t max) {
@@ -271,7 +293,15 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1;
             return;
         }
-        /* ramfs takes precedence over the read-only initrd. */
+        /* device files, then ramfs, then the read-only initrd. */
+        struct file *dev = try_dev_open(name);
+        if (dev) {
+            int fd = sched_install_fd(dev);
+            if (fd < 0)
+                file_unref(dev);
+            regs->eax = (uint32_t)fd;
+            return;
+        }
         struct ramfs_file *rf = ramfs_find(name);
         struct file *f;
         if (rf) {
@@ -308,6 +338,14 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1;
             return;
         }
+        struct file *dev = try_dev_open(name); /* '> /dev/null' discards */
+        if (dev) {
+            int fd = sched_install_fd(dev);
+            if (fd < 0)
+                file_unref(dev);
+            regs->eax = (uint32_t)fd;
+            return;
+        }
         struct ramfs_file *rf = ramfs_create(name);
         if (!rf) {
             regs->eax = (uint32_t)-1;
@@ -330,6 +368,14 @@ void syscall_handle(struct registers *regs) {
         char name[RAMFS_NAME_MAX];
         if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
             regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct file *dev = try_dev_open(name);
+        if (dev) {
+            int fd = sched_install_fd(dev);
+            if (fd < 0)
+                file_unref(dev);
+            regs->eax = (uint32_t)fd;
             return;
         }
         /* Open the existing file (preserving contents) or create it. */
@@ -429,6 +475,17 @@ void syscall_handle(struct registers *regs) {
             regs->eax = (uint32_t)-1; /* wrong end */
             return;
         }
+        if (f->kind == FILE_NULL) {
+            regs->eax = 0; /* always EOF */
+            return;
+        }
+        if (f->kind == FILE_ZERO) {
+            uint8_t *dst = (uint8_t *)buf;
+            for (uint32_t i = 0; i < n; i++)
+                dst[i] = 0;
+            regs->eax = n; /* endless zeros */
+            return;
+        }
         /* FILE_INITRD / FILE_RAMFS: byte stream by offset, 0 at EOF. */
         const uint8_t *fdata;
         uint32_t fsize;
@@ -465,6 +522,10 @@ void syscall_handle(struct registers *regs) {
             if (w >= 0)
                 f->offset += (uint32_t)w;
             regs->eax = (uint32_t)w;
+            return;
+        }
+        if (f->kind == FILE_NULL || f->kind == FILE_ZERO) {
+            regs->eax = n; /* discard, report success */
             return;
         }
         if (f->kind != FILE_CONSOLE) {
