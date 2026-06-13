@@ -3,6 +3,7 @@
 
 #include "file.h"
 #include "initrd.h"
+#include "io.h"
 #include "keyboard.h"
 #include "kprintf.h"
 #include "memlayout.h"
