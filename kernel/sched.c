@@ -22,7 +22,7 @@
 #include "timer.h"
 #include "usermode.h"
 
-#define MAX_TASKS 8
+#define MAX_TASKS 32
 #define KSTACK_SIZE 8192u
 
 enum task_state {
@@ -46,6 +46,7 @@ struct task {
     uint32_t wake_at;    /* tick at which a BLOCKED task becomes READY */
     uint32_t wait_pid;   /* pid a WAITPID task is waiting on */
     uint32_t parent_pid; /* spawner; foreground reverts here on exit */
+    uint32_t exit_code;  /* valid once ZOMBIE; (uint32_t)-1 when killed */
     char name[16];       /* argv[0], for ps */
 };
 
@@ -251,14 +252,50 @@ static void wake_waiters(uint32_t pid) {
             tasks[i].state = TASK_READY;
 }
 
+/* Reclaim one zombie slot if it still is one: claim it atomically (the
+ * shell's reaper and a waiting parent may race), then free its resources
+ * from copied fields so a concurrent spawner reusing the slot is safe. */
+static int reap_slot(struct task *t, uint32_t *code_out) {
+    uint32_t f = irq_save();
+    if (t->state != TASK_ZOMBIE) {
+        irq_restore(f);
+        return 0;
+    }
+    t->state = TASK_FREE; /* claim */
+    uint32_t pd = t->pd_phys;
+    uint8_t *ks = t->kstack;
+    uint32_t code = t->exit_code;
+    irq_restore(f);
+
+    paging_destroy_address_space(pd);
+    kfree(ks);
+    if (code_out)
+        *code_out = code;
+    return 1;
+}
+
 /* Block the calling task until `pid` exits (syscall context; IF off, so
- * the alive-check cannot race an exit). No-op if it's already gone. */
-void sched_wait_pid(uint32_t pid) {
-    if (pid == current->pid || !sched_pid_alive(pid))
+ * the alive-check cannot race an exit), then collect its exit status and
+ * reclaim it. *status_out becomes (uint32_t)-1 if the pid is unknown or
+ * someone else already collected it. */
+void sched_wait_pid(uint32_t pid, uint32_t *status_out) {
+    if (status_out)
+        *status_out = (uint32_t)-1;
+    if (pid == current->pid)
         return;
-    current->wait_pid = pid;
-    current->state = TASK_WAITPID;
-    schedule();
+
+    if (sched_pid_alive(pid)) {
+        current->wait_pid = pid;
+        current->state = TASK_WAITPID;
+        schedule();
+    }
+
+    for (int i = 1; i < MAX_TASKS; i++) {
+        if (tasks[i].pid == pid && tasks[i].state == TASK_ZOMBIE) {
+            reap_slot(&tasks[i], status_out);
+            return;
+        }
+    }
 }
 
 uint32_t sched_foreground_pid(void) {
@@ -298,6 +335,7 @@ int sched_kill(uint32_t pid) {
             (tasks[i].state == TASK_READY || tasks[i].state == TASK_BLOCKED ||
              tasks[i].state == TASK_WAITKBD ||
              tasks[i].state == TASK_WAITPID)) {
+            tasks[i].exit_code = (uint32_t)-1; /* killed, not exited */
             tasks[i].state = TASK_ZOMBIE;
             wake_waiters(pid);
             if (fg_pid == pid)
@@ -342,20 +380,15 @@ uint32_t sched_switch_count(void) {
 }
 
 void sched_reap(void) {
-    for (int i = 1; i < MAX_TASKS; i++) {
-        if (tasks[i].state != TASK_ZOMBIE)
-            continue;
-        paging_destroy_address_space(tasks[i].pd_phys);
-        kfree(tasks[i].kstack);
-        tasks[i].kstack = NULL;
-        tasks[i].state = TASK_FREE;
-    }
+    for (int i = 1; i < MAX_TASKS; i++)
+        reap_slot(&tasks[i], NULL);
 }
 
-void task_exit(void) {
+void task_exit(uint32_t code) {
     kprintf("[pid %lu] exited\n", current->pid);
     if (fg_pid == current->pid)
         fg_pid = current->parent_pid; /* keyboard back to the parent */
+    current->exit_code = code;
     wake_waiters(current->pid);
     current->state = TASK_ZOMBIE;
     schedule(); /* never returns: zombies aren't picked again */

@@ -64,13 +64,11 @@ void paging_init(void) {
         table[pt_idx] = phys | PAGE_PRESENT | PAGE_WRITE;
     }
 
-    /* Preallocate the heap region's page table now, so the kernel half of
+    /* Preallocate every heap-region page table now, so the kernel half of
      * the directory never changes afterward — a process address space can
      * then share it by copying PDEs once at creation time. */
-    {
-        uint32_t pd_idx = KHEAP_VIRT_BASE >> 22;
-        dir[pd_idx] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
-    }
+    for (uint32_t v = KHEAP_VIRT_BASE; v < KHEAP_VIRT_LIMIT; v += 4u << 20)
+        dir[v >> 22] = alloc_table_phys() | PAGE_PRESENT | PAGE_WRITE;
 
     /* Switch to the new directory (full TLB flush): the boot-time identity
      * mapping disappears here. CR4.PSE stays set but is unused — the new

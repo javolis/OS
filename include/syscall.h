@@ -6,7 +6,7 @@
 
 #define SYSCALL_VECTOR 0x80
 
-#define SYS_EXIT 0
+#define SYS_EXIT 0     /* ebx = exit code */
 #define SYS_WRITE 1    /* ebx = NUL-terminated string (user address) */
 #define SYS_SLEEP 2    /* ebx = milliseconds; blocks the task */
 #define SYS_GETPID 3   /* returns the caller's pid in eax */
@@ -16,7 +16,8 @@
 #define SYS_SPAWN 5    /* ebx = cmdline string (file name + args); ecx = 1
                         * to pass the foreground on (caller must own it);
                         * returns child pid or -1 */
-#define SYS_WAIT 6     /* ebx = pid; blocks until it exits */
+#define SYS_WAIT 6     /* ebx = pid; blocks until it exits, returns its
+                        * exit status (and reclaims it) */
 #define SYS_SYSINFO 7  /* ebx = struct sysinfo* (user, writable) */
 
 /* Keep in sync with the userland copy in user/usys.h. */

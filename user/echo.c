@@ -1,4 +1,4 @@
-/* echo.c — userland: prints its arguments, proving argc/argv arrive on
+/* echo.c - userland: prints its arguments, proving argc/argv arrive on
  * the user stack per the C calling convention. */
 #include "usys.h"
 
@@ -9,5 +9,5 @@ void _start(int argc, char **argv) {
             sys_write(" ");
     }
     sys_write("\n");
-    sys_exit();
+    sys_exit(0);
 }

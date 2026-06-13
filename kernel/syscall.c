@@ -96,7 +96,7 @@ static uint32_t do_readline(char *dst, uint32_t max) {
 void syscall_handle(struct registers *regs) {
     switch (regs->eax) {
     case SYS_EXIT:
-        task_exit();
+        task_exit(regs->ebx);
 
     case SYS_WRITE: {
         if (!user_string_ok(regs->ebx)) {
@@ -170,10 +170,12 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
-    case SYS_WAIT:
-        sched_wait_pid(regs->ebx);
-        regs->eax = 0;
+    case SYS_WAIT: {
+        uint32_t status;
+        sched_wait_pid(regs->ebx, &status);
+        regs->eax = status;
         return;
+    }
 
     case SYS_SYSINFO: {
         if (!user_range_writable(regs->ebx, sizeof(struct sysinfo))) {

@@ -1,4 +1,4 @@
-/* greet.c — userland: interactive keyboard input via sys_readline. */
+/* greet.c - userland: interactive keyboard input via sys_readline. */
 #include "usys.h"
 
 void _start(void) {
@@ -12,5 +12,5 @@ void _start(void) {
     } else {
         sys_write("\ngreet: no input\n");
     }
-    sys_exit();
+    sys_exit(0);
 }

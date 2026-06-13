@@ -243,6 +243,15 @@ else
     fail=1
 fi
 
+# Exit codes: runner waits on exitcode.elf (exits 42) and reports the
+# status sys_wait returned.
+if grep -q "runner: child status=42" "$SERIAL_LOG"; then
+    echo "PASS: sys_wait returned the child exit code"
+else
+    echo "FAIL: exit code did not reach the parent" >&2
+    fail=1
+fi
+
 # Spawn/wait: runner spawns echo.elf and waits for it, so its completion
 # line must come after the child's output.
 child_line=$(grep -n "from runner child" "$SERIAL_LOG" | head -n 1 | cut -d: -f1)

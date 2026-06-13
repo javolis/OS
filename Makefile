@@ -19,7 +19,7 @@ HDRS := $(wildcard include/*.h)
 # initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/crash.elf user/echo.elf user/greet.elf user/runner.elf \
-             user/ush.elf user/sysinfo.elf
+             user/ush.elf user/sysinfo.elf user/exitcode.elf
 INITRD    := initrd.tar
 
 .PHONY: all iso run test clean
