@@ -5,7 +5,7 @@
 struct file;
 
 /* Create a pipe and its two end file objects (each with refs = 1).
- * Returns 0 and sets *rd/*wr, or -1 on allocation failure. */
+ * Returns 0 and sets the read/write outputs, or -1 on allocation failure. */
 int pipe_create(struct file **rd, struct file **wr);
 
 /* Blocking byte transfer. read returns bytes read, 0 at EOF (all writers

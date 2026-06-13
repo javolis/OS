@@ -213,7 +213,7 @@ void shell_run(void) {
                     /* Foreground is assigned inside spawn, atomically with
                      * the task becoming runnable; exit hands it back. */
                     int pid = process_spawn(img, img + size, rest,
-                                            !background);
+                                            !background, 0, 0);
                     if (pid < 0) {
                         kprintf("run: %s: spawn failed\n", fname);
                     } else if (!background) {

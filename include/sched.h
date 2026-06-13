@@ -2,6 +2,8 @@
 #pragma once
 #include <stdint.h>
 
+struct file;
+
 void sched_init(void);
 
 /* Register a user task: it first runs by ireting to user_eip:user_esp in
