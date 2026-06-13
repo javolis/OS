@@ -19,6 +19,11 @@
 #define SYS_WAIT 6     /* ebx = pid; blocks until it exits, returns its
                         * exit status (and reclaims it) */
 #define SYS_SYSINFO 7  /* ebx = struct sysinfo* (user, writable) */
+#define SYS_OPEN 8     /* ebx = initrd file name; returns fd or -1 */
+#define SYS_READ 9     /* ebx = fd, ecx = buf, edx = n; returns bytes read,
+                        * 0 at EOF (console: one edited line, fg only) */
+#define SYS_WRITEFD 10 /* ebx = fd, ecx = buf, edx = n; returns n or -1 */
+#define SYS_CLOSE 11   /* ebx = fd */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct sysinfo {

@@ -49,6 +49,12 @@ uint32_t sched_alive_count(void);
 
 uint32_t sched_current_pid(void);
 
+/* Current task's file-descriptor table (syscall context). */
+struct file;
+struct file *sched_get_fd(int fd);
+int sched_install_fd(struct file *f); /* first free slot, or -1 */
+void sched_clear_fd(int fd);
+
 /* Print the task table via kprintf (the shell's ps command). */
 void sched_ps(void);
 

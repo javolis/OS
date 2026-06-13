@@ -71,3 +71,35 @@ static inline int sys_sysinfo(struct sysinfo *out) {
     __asm__ volatile("int $0x80" : "=a"(ret) : "a"(7), "b"(out) : "memory");
     return ret;
 }
+
+/* Open an initrd file read-only. Returns a file descriptor or -1. */
+static inline int sys_open(const char *name) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(8), "b"(name));
+    return ret;
+}
+
+/* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
+static inline int sys_read(int fd, char *buf, int n) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(9), "b"(fd), "c"(buf), "d"(n)
+                     : "memory");
+    return ret;
+}
+
+static inline int sys_writefd(int fd, const char *buf, int n) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(10), "b"(fd), "c"(buf), "d"(n)
+                     : "memory");
+    return ret;
+}
+
+static inline int sys_close(int fd) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(11), "b"(fd));
+    return ret;
+}
