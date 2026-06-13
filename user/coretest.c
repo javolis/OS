@@ -49,6 +49,8 @@ static void check(const char *cmd, const char *in, const char *exp,
 
 void _start(void) {
     check("grep.elf bet", "alpha\nbeta\ngamma\n", "beta\n", "grep");
+    check("sort.elf", "banana\napple\ncherry\n", "apple\nbanana\ncherry\n",
+          "sort");
 
     if (failed == 0)
         uprintf("coretest: all ok (%d filters)\n", passed);
