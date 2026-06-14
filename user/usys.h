@@ -165,6 +165,17 @@ static inline int sys_ping(unsigned int ip) {
     return ret;
 }
 
+/* DNS-resolve a hostname; writes the IPv4 address (host order) to *out.
+ * Returns 0 on success, -1 on failure. */
+static inline int sys_resolve(const char *name, unsigned int *out) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(24), "b"(name), "c"(out)
+                     : "memory");
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

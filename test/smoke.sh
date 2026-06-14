@@ -81,6 +81,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                d d s d q \
                r u n spc g f x c a p dot e l f ret \
                r u n spc p i n g dot e l f ret \
+               r u n spc n s l o o k u p dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -231,6 +232,17 @@ if grep -q "ping: reply from 10.0.2.2" "$SERIAL_LOG"; then
     echo "PASS: ICMP ping round-trip to the gateway (userland)"
 else
     echo "FAIL: ping got no reply" >&2
+    fail=1
+fi
+
+# UDP + DNS: nslookup queries SLIRP's DNS server (10.0.2.3:53) over UDP and
+# the reply comes back to our ephemeral port. The UDP datagram arriving
+# from 10.0.2.3:53 proves UDP send/receive and demux; SLIRP responds as
+# long as the host has DNS (CI runners do).
+if grep -qE "udp: rx [0-9]+ bytes from 10.0.2.3:53" "$SERIAL_LOG"; then
+    echo "PASS: UDP round-trip with the DNS server (DNS query/reply)"
+else
+    echo "FAIL: no UDP reply from the DNS server" >&2
     fail=1
 fi
 

@@ -51,6 +51,9 @@
 #define SYS_PING 23     /* ebx = IPv4 address in host byte order; sends an
                          * ICMP echo and waits. Returns the round-trip time
                          * in milliseconds, or -1 on timeout. */
+#define SYS_RESOLVE 24  /* ebx = hostname string, ecx = uint32* (writable);
+                         * DNS-resolves the name and writes the IPv4 address
+                         * in host byte order. Returns 0, or -1 on failure. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

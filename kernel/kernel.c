@@ -26,6 +26,7 @@
 #include "shell.h"
 #include "term.h"
 #include "timer.h"
+#include "udp.h"
 
 #if defined(__linux__)
 #error "This kernel must be built with a cross-compiler, not the host toolchain."
@@ -100,6 +101,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         arp_init();
         ip_init();
         icmp_init();
+        udp_init();
         ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }
