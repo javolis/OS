@@ -54,6 +54,9 @@
 #define SYS_RESOLVE 24  /* ebx = hostname string, ecx = uint32* (writable);
                          * DNS-resolves the name and writes the IPv4 address
                          * in host byte order. Returns 0, or -1 on failure. */
+#define SYS_DHCP 25     /* run the DHCP handshake and apply the lease.
+                         * Returns the leased IPv4 address (host order), or
+                         * 0 on failure. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

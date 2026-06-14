@@ -176,6 +176,14 @@ static inline int sys_resolve(const char *name, unsigned int *out) {
     return ret;
 }
 
+/* Run DHCP and apply the lease. Returns the leased IPv4 address (host
+ * order), or 0 on failure. */
+static inline unsigned int sys_dhcp(void) {
+    unsigned int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(25));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

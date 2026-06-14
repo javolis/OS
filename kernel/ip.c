@@ -90,6 +90,30 @@ int ip_send(ipaddr_t dst, uint8_t protocol, const void *payload,
     return 0;
 }
 
+int ip_send_raw(ipaddr_t src, ipaddr_t dst, const uint8_t dst_mac[6],
+                uint8_t protocol, const void *payload, uint16_t len) {
+    uint8_t pkt[600];
+    if ((int)len + (int)sizeof(struct ip_header) > (int)sizeof(pkt))
+        return -1;
+    struct ip_header *h = (struct ip_header *)pkt;
+    h->version_ihl = 0x45;
+    h->tos = 0;
+    h->total_length = htons((uint16_t)(sizeof(*h) + len));
+    h->id = htons(ip_id++);
+    h->flags_frag = htons(0x4000);
+    h->ttl = 64;
+    h->protocol = protocol;
+    h->checksum = 0;
+    ip_bytes(src, h->src);
+    ip_bytes(dst, h->dst);
+    h->checksum = htons(ip_checksum(h, sizeof(*h)));
+    const uint8_t *pl = (const uint8_t *)payload;
+    for (uint16_t i = 0; i < len; i++)
+        pkt[sizeof(*h) + i] = pl[i];
+    eth_send(dst_mac, ETH_TYPE_IPV4, pkt, (uint16_t)(sizeof(*h) + len));
+    return 0;
+}
+
 static void ip_rx(const uint8_t *src_mac, const uint8_t *payload,
                   uint16_t len) {
     (void)src_mac;

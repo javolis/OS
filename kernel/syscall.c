@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dhcp.h"
 #include "dns.h"
 #include "fb.h"
 #include "file.h"
@@ -733,6 +734,10 @@ void syscall_handle(struct registers *regs) {
         }
         return;
     }
+
+    case SYS_DHCP:
+        regs->eax = (uint32_t)dhcp_run();
+        return;
 
     case SYS_GETKEY: {
         /* One raw key, no echo or line editing. Like readline, only the

@@ -23,6 +23,21 @@ static uint8_t rx_store[1500];
 static volatile uint16_t rx_len;
 static int udp_logged;
 
+#define UDP_LISTENERS 4
+static struct {
+    uint16_t port;
+    udp_listener_fn fn;
+} listeners[UDP_LISTENERS];
+static int nlisteners;
+
+void udp_listen(uint16_t port, udp_listener_fn fn) {
+    if (nlisteners < UDP_LISTENERS) {
+        listeners[nlisteners].port = port;
+        listeners[nlisteners].fn = fn;
+        nlisteners++;
+    }
+}
+
 int udp_send(ipaddr_t dst, uint16_t sport, uint16_t dport, const void *data,
              uint16_t len) {
     uint8_t pkt[1500];
@@ -65,6 +80,9 @@ static void udp_rx(ipaddr_t src, const uint8_t *payload, uint16_t len) {
         rx_len = n;
         udp_got = 1;
     }
+    for (int i = 0; i < nlisteners; i++)
+        if (listeners[i].port == dport)
+            listeners[i].fn(src, payload + 8, dlen);
 }
 
 void udp_init(void) {
