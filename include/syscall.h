@@ -43,6 +43,11 @@
                          * framebuffer geometry. 0 if a framebuffer exists,
                          * -1 on a VGA-text-only boot. Pair with open("/dev/fb")
                          * and writefd to blit raw pixels. */
+#define SYS_GETKEY 22   /* one raw keyboard char (no echo or line editing);
+                         * foreground task only. Blocks until a key arrives.
+                         * Returns 0..255, or -1 if not foreground. For
+                         * interactive graphics (KEY_UP/DOWN come through as
+                         * 0x80/0x81). */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

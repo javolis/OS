@@ -77,6 +77,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc f b t e s t dot e l f ret \
                r u n spc u g f x t e s t dot e l f ret \
                r u n spc g f x d e m o dot e l f ret \
+               r u n spc i n p u t d e m o dot e l f ret \
+               d d s d q \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -485,6 +487,17 @@ if grep -q "gfxdemo: rendered" "$SERIAL_LOG"; then
     echo "PASS: gfxdemo composed and rendered a scene"
 else
     echo "FAIL: gfxdemo did not render" >&2
+    fail=1
+fi
+
+# inputdemo: an interactive graphics loop. CI types 'd d s d q', so the box
+# moves 4 times then quits. Require at least one logged move and a clean
+# exit, proving SYS_GETKEY delivered raw keys to the graphics loop.
+if grep -q "inputdemo: key " "$SERIAL_LOG" \
+        && grep -qE "inputdemo: bye after [1-9]" "$SERIAL_LOG"; then
+    echo "PASS: graphical input loop moved on keypresses (SYS_GETKEY)"
+else
+    echo "FAIL: graphical input loop did not respond to keys" >&2
     fail=1
 fi
 

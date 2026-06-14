@@ -709,6 +709,18 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_GETKEY: {
+        /* One raw key, no echo or line editing. Like readline, only the
+         * foreground task may take the keyboard. Blocks the task (not the
+         * CPU) until a key is available. */
+        if (sched_current_pid() != sched_foreground_pid()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)(unsigned char)task_getchar();
+        return;
+    }
+
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
             regs->eax = (uint32_t)-1;
