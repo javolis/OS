@@ -9,10 +9,11 @@
  * "avolis.elf test" bounds the loop and quits on 'q' for CI. */
 #include "avui.h"
 
-enum { LOCK, DESKTOP, PALETTE };
+enum { LOCK, DESKTOP, PALETTE, APPS };
 enum { TB_BOTTOM, TB_LEFT, TB_RIGHT, TB_TOP };
 
 #define TB_THICK 60
+#define APPS_COLS 4
 #define K_UP 0x80
 #define K_DOWN 0x81
 
@@ -205,6 +206,25 @@ static void draw_palette(ugfx_t *g, int pos, int sel) {
     }
 }
 
+static void draw_apps(ugfx_t *g, int sel) {
+    int W = (int)g->width, H = (int)g->height;
+    ugfx_vgradient(g, 0, 0, W, H, ugfx_rgb(10, 12, 22), AV_BG);
+    av_head(g, 40, 56, "Applications", AV_ORANGE);
+
+    int tw = 150, th = 92, gap = 24;
+    int gw = APPS_COLS * tw + (APPS_COLS - 1) * gap;
+    int gx = (W - gw) / 2, gy = 120;
+    for (int i = 0; i < NPAL; i++) {
+        int col = i % APPS_COLS, row = i / APPS_COLS;
+        int x = gx + col * (tw + gap), y = gy + row * (th + gap);
+        av_panel(g, x, y, tw, th, i == sel);
+        ua_text_center(g, UAFONT_BODY, x, tw, y + th / 2 + 6, pal[i].label,
+                       i == sel ? AV_ORANGE : AV_WHITE);
+    }
+    ua_text_center(g, UAFONT_BODY, 0, W, H - 48,
+                   "enter open    -    esc back", AV_DIM);
+}
+
 static void launch(const char *elf) {
     if (!elf[0])
         return;
@@ -228,6 +248,8 @@ void _start(int argc, char **argv) {
             draw_lock(&g);
         else if (state == DESKTOP)
             draw_desktop(&g, pos, focus);
+        else if (state == APPS)
+            draw_apps(&g, sel);
         else
             draw_palette(&g, pos, sel);
         ugfx_flush(&g);
@@ -244,7 +266,7 @@ void _start(int argc, char **argv) {
             continue;
         }
 
-        if (k == 'q' && state != PALETTE) {
+        if (k == 'q' && (state == DESKTOP || state == LOCK)) {
             quit = 1;
         } else if (state == LOCK) {
             if (k == '\n' || k == '\r') {
@@ -269,13 +291,30 @@ void _start(int argc, char **argv) {
             else if (k == '\n' || k == '\r') {
                 if (bar[focus].elf[0]) {
                     launch(bar[focus].elf);
-                } else { /* "Apps"/"Settings" open the palette */
-                    qlen = 0;
-                    query[0] = '\0';
+                } else { /* "Apps"/"Settings" open the application overview */
                     sel = 0;
-                    state = PALETTE;
-                    uprintf("avolis: palette\n");
+                    state = APPS;
+                    uprintf("avolis: apps\n");
                 }
+            }
+        } else if (state == APPS) {
+            if (k == 27) {
+                state = DESKTOP;
+            } else if (k == K_UP) {
+                if (sel >= APPS_COLS)
+                    sel -= APPS_COLS;
+            } else if (k == K_DOWN) {
+                if (sel + APPS_COLS < NPAL)
+                    sel += APPS_COLS;
+            } else if (k == 'a') {
+                if (sel > 0)
+                    sel--;
+            } else if (k == 'd') {
+                if (sel < NPAL - 1)
+                    sel++;
+            } else if (k == '\n' || k == '\r') {
+                launch(pal[sel].elf);
+                state = DESKTOP;
             }
         } else { /* PALETTE */
             if (k == 27) {
