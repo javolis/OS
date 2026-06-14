@@ -11,6 +11,7 @@
 #include "kprintf.h"
 #include "memlayout.h"
 #include "multiboot.h"
+#include "net.h"
 #include "paging.h"
 #include "pci.h"
 #include "pic.h"
@@ -88,9 +89,13 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     }
 
     /* Enumerate the PCI bus so device drivers (e.g. the NIC) can find their
-     * hardware, BARs and IRQ line, then bring up the network card. */
+     * hardware, BARs and IRQ line, then bring up the network card and the
+     * Ethernet layer. */
     pci_init();
-    rtl8139_init();
+    if (rtl8139_init() == 0) {
+        eth_init();
+        eth_arp_probe(); /* elicit an ARP reply to prove the RX path */
+    }
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs
