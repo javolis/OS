@@ -91,6 +91,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r a m t e s t dot e l f ret \
                r u n spc a p p e n d t e s t dot e l f ret \
                r u n spc d i r t e s t dot e l f ret \
+               r u n spc e n v t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -550,6 +551,15 @@ if grep -q "dirtest: ok" "$SERIAL_LOG"; then
     echo "PASS: ramfs directories (mkdir + nested file + readdir)"
 else
     echo "FAIL: ramfs directories misbehaved" >&2
+    fail=1
+fi
+
+# Environment: envtest sets GREETING then spawns envchild, which reads it
+# back, proving a spawned program inherits the environment.
+if grep -q "envchild: GREETING=hello-env" "$SERIAL_LOG"; then
+    echo "PASS: environment variable inherited across spawn"
+else
+    echo "FAIL: environment not inherited" >&2
     fail=1
 fi
 

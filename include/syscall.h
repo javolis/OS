@@ -70,6 +70,10 @@
 #define SYS_MKDIR 31    /* ebx = path; create a ramfs directory marker.
                          * Returns 0, or -1 if it exists or the table is
                          * full. */
+#define SYS_SETENV 32   /* ebx = name, ecx = value; set a global env var
+                         * (empty value clears it). 0 or -1. */
+#define SYS_GETENV 33   /* ebx = name, ecx = buf, edx = max; copies the
+                         * value. Returns its length, or -1 if unset. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
