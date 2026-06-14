@@ -12,6 +12,7 @@ enum file_kind {
     FILE_RAMFS,       /* read/write view of a writable ramfs file */
     FILE_NULL,        /* /dev/null: discard writes, read EOF */
     FILE_ZERO,        /* /dev/zero: discard writes, read endless zeros */
+    FILE_FB,          /* /dev/fb: raw framebuffer bytes, offset-addressed */
 };
 
 struct pipe;

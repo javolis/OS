@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "fb.h"
 #include "file.h"
 #include "initrd.h"
 #include "io.h"
@@ -78,6 +79,8 @@ static struct file *try_dev_open(const char *name) {
         kind = FILE_NULL;
     else if (names_match(name, "/dev/zero"))
         kind = FILE_ZERO;
+    else if (names_match(name, "/dev/fb") && fb_available())
+        kind = FILE_FB; /* only openable when a framebuffer exists */
     if (!kind)
         return NULL;
     return file_alloc(kind);
@@ -577,6 +580,21 @@ void syscall_handle(struct registers *regs) {
             regs->eax = n; /* endless zeros */
             return;
         }
+        if (f->kind == FILE_FB) {
+            /* Read raw framebuffer bytes back from the advancing offset
+             * (lets a program verify what it blitted). 0 at end. */
+            const uint8_t *base = fb_base();
+            uint32_t fbbytes = fb_pitch() * fb_height();
+            uint32_t left = (base && f->offset < fbbytes) ? fbbytes - f->offset
+                                                          : 0;
+            uint32_t take = n < left ? n : left;
+            uint8_t *dst = (uint8_t *)buf;
+            for (uint32_t i = 0; i < take; i++)
+                dst[i] = base[f->offset + i];
+            f->offset += take;
+            regs->eax = take;
+            return;
+        }
         /* FILE_INITRD / FILE_RAMFS: byte stream by offset, 0 at EOF. */
         const uint8_t *fdata;
         uint32_t fsize;
@@ -619,6 +637,25 @@ void syscall_handle(struct registers *regs) {
             regs->eax = n; /* discard, report success */
             return;
         }
+        if (f->kind == FILE_FB) {
+            /* Blit raw pixel bytes into the framebuffer at the advancing
+             * offset; a full-frame blit writes from offset 0. Clamped to
+             * the mapped framebuffer so a runaway write can't escape it. */
+            uint8_t *base = fb_base();
+            uint32_t fbbytes = fb_pitch() * fb_height();
+            if (!base) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+            uint32_t left = (f->offset < fbbytes) ? fbbytes - f->offset : 0;
+            uint32_t take = n < left ? n : left;
+            const uint8_t *src = (const uint8_t *)buf;
+            for (uint32_t i = 0; i < take; i++)
+                base[f->offset + i] = src[i];
+            f->offset += take;
+            regs->eax = take;
+            return;
+        }
         if (f->kind != FILE_CONSOLE) {
             regs->eax = (uint32_t)-1; /* initrd read-only, pipe read end */
             return;
@@ -650,6 +687,24 @@ void syscall_handle(struct registers *regs) {
         si->free_frames = pmm_free_frames();
         si->total_frames = pmm_total_frames();
         si->tasks_alive = sched_alive_count();
+        regs->eax = 0;
+        return;
+    }
+
+    case SYS_FBINFO: {
+        if (!user_range_writable(regs->ebx, sizeof(struct fbinfo))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (!fb_available()) {
+            regs->eax = (uint32_t)-1; /* VGA-text-only boot: no framebuffer */
+            return;
+        }
+        struct fbinfo *fi = (struct fbinfo *)regs->ebx;
+        fi->width = fb_width();
+        fi->height = fb_height();
+        fi->pitch = fb_pitch();
+        fi->bpp = fb_bpp();
         regs->eax = 0;
         return;
     }

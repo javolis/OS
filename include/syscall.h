@@ -39,6 +39,10 @@
                          * enumerates initrd then ramfs; 0 or -1 at end */
 #define SYS_SBRK 20     /* ebx = signed increment; grows the per-process
                          * heap and returns the old break, or -1 */
+#define SYS_FBINFO 21   /* ebx = struct fbinfo* (user, writable); fills the
+                         * framebuffer geometry. 0 if a framebuffer exists,
+                         * -1 on a VGA-text-only boot. Pair with open("/dev/fb")
+                         * and writefd to blit raw pixels. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
@@ -51,6 +55,14 @@ struct dirent {
 struct systime {
     uint16_t year;
     uint8_t month, day, hour, minute, second;
+};
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct fbinfo {
+    uint32_t width;  /* pixels */
+    uint32_t height; /* pixels */
+    uint32_t pitch;  /* bytes per scanline */
+    uint32_t bpp;    /* bits per pixel: 24 or 32 */
 };
 
 /* Keep in sync with the userland copy in user/usys.h. */
