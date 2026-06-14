@@ -212,6 +212,22 @@ static inline int sys_tcp_close(void) {
     return ret;
 }
 
+/* Keep in sync with the kernel's struct netinfo in include/syscall.h. */
+struct netinfo {
+    unsigned int ip;
+    unsigned int gateway;
+    unsigned int netmask;
+    unsigned int dns;
+};
+
+/* Read the current IPv4 configuration (host byte order). 0 if networking is
+ * up, -1 if there is no NIC. */
+static inline int sys_netinfo(struct netinfo *out) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(30), "b"(out) : "memory");
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

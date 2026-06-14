@@ -105,6 +105,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc p i n g dot e l f ret \
                r u n spc n s l o o k u p dot e l f ret \
                r u n spc t c p e c h o dot e l f ret \
+               r u n spc n e t c a p dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -286,6 +287,16 @@ if grep -q "tcp: echo ok" "$SERIAL_LOG"; then
     echo "PASS: TCP connect/send/recv echo round-trip"
 else
     echo "FAIL: TCP echo did not round-trip" >&2
+    fail=1
+fi
+
+# Networking capstone: one program exercises DHCP, the config read, ICMP
+# ping, DNS and TCP echo, tallying the result. ALL PASS prints only if the
+# whole stack worked end to end from ring 3.
+if grep -qE "netcap: ALL PASS \([0-9]+ tests\)" "$SERIAL_LOG"; then
+    echo "PASS: networking capstone all green"
+else
+    echo "FAIL: networking capstone had failures" >&2
     fail=1
 fi
 
