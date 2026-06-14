@@ -466,11 +466,12 @@ else
     fail=1
 fi
 
-# ugfx library: ugfxtest draws into a backbuffer, verifies the exact pixel
-# bytes in memory, then flushes to /dev/fb and reads the first pixel back.
-# The ok line prints only if the backbuffer and the blit both checked out.
+# ugfx library: ugfxtest draws shapes and text into a backbuffer, verifies
+# the exact pixel bytes in memory (including lit and transparent glyph
+# pixels), then flushes to /dev/fb and reads the first pixel back. The ok
+# line prints only if every check passed.
 if grep -q "ugfxtest: ok" "$SERIAL_LOG"; then
-    echo "PASS: ugfx draws and flushes to the framebuffer"
+    echo "PASS: ugfx draws shapes and text and flushes to the framebuffer"
 else
     echo "FAIL: ugfx library misbehaved" >&2
     fail=1
