@@ -185,8 +185,8 @@ static inline int ugfx_flush(ugfx_t *g) {
     unsigned off = 0;
     while (off < total) {
         unsigned chunk = total - off;
-        if (chunk > 1024) /* SYS_WRITE_MAX */
-            chunk = 1024;
+        if (chunk > (1u << 18)) /* /dev/fb takes large blits; keep calls few */
+            chunk = (1u << 18);
         int w = sys_writefd(fd, (const char *)(g->back + off), (int)chunk);
         if (w <= 0)
             break;

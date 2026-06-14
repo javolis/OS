@@ -22,7 +22,7 @@
 #include "paging.h"
 
 #define FB_VIRT_BASE 0xF0000000u  /* kernel window for the framebuffer */
-#define FB_MAX_BYTES (16u << 20)  /* cap the mapping at 16 MiB */
+#define FB_MAX_BYTES (32u << 20)  /* cap the mapping at 32 MiB (up to ~1440p) */
 #define FRAME_SIZE 4096u
 
 static uint8_t *fb;
