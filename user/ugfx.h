@@ -59,6 +59,37 @@ static inline void ugfx_putpixel(ugfx_t *g, int x, int y, unsigned rgb) {
         p[3] = 0;
 }
 
+/* Read a backbuffer pixel as 0x00RRGGBB (bytes are B, G, R). */
+static inline unsigned ugfx_getpixel(ugfx_t *g, int x, int y) {
+    if (!g->ok || x < 0 || y < 0 || (unsigned)x >= g->width ||
+        (unsigned)y >= g->height)
+        return 0;
+    unsigned char *p = g->back + (unsigned)y * g->pitch + (unsigned)x * g->bypp;
+    return ((unsigned)p[2] << 16) | ((unsigned)p[1] << 8) | (unsigned)p[0];
+}
+
+/* Alpha-blend rgb over the existing pixel with coverage cov (0..255). This
+ * is what makes anti-aliased text and soft UI edges possible. */
+static inline void ugfx_blend_pixel(ugfx_t *g, int x, int y, unsigned rgb,
+                                    unsigned cov) {
+    if (cov == 0)
+        return;
+    if (cov >= 255) {
+        ugfx_putpixel(g, x, y, rgb);
+        return;
+    }
+    unsigned bg = ugfx_getpixel(g, x, y);
+    int br = (int)((bg >> 16) & 0xFF), bgc = (int)((bg >> 8) & 0xFF),
+        bb = (int)(bg & 0xFF);
+    int fr = (int)((rgb >> 16) & 0xFF), fgc = (int)((rgb >> 8) & 0xFF),
+        fb = (int)(rgb & 0xFF);
+    int a = (int)cov;
+    unsigned r = (unsigned)(br + (fr - br) * a / 255);
+    unsigned gg = (unsigned)(bgc + (fgc - bgc) * a / 255);
+    unsigned b = (unsigned)(bb + (fb - bb) * a / 255);
+    ugfx_putpixel(g, x, y, (r << 16) | (gg << 8) | b);
+}
+
 /* Filled rectangle, clipped to the surface (negative origins are fine). */
 static inline void ugfx_fillrect(ugfx_t *g, int x, int y, int w, int h,
                                  unsigned rgb) {

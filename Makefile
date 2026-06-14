@@ -17,6 +17,11 @@ OBJ  := $(patsubst %.s,%.o,$(wildcard boot/*.s)) \
         $(patsubst %.c,%.o,$(wildcard kernel/*.c))
 HDRS := $(wildcard include/*.h)
 
+# Anti-aliased font: generated from a libre TTF by tools/genfont.py at build
+# time (needs python3 + Pillow + a DejaVu font). Userland (ugfx text) uses
+# it; it is a build artifact, not committed.
+FONT_AA := include/font_aa.h
+
 # Userland: standalone ELF executables, shipped to the kernel in a USTAR
 # initrd that GRUB loads as a Multiboot module.
 USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
@@ -36,7 +41,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/ping.elf user/nslookup.elf user/dhcp.elf \
              user/tcpecho.elf user/netcap.elf user/dirtest.elf \
              user/envtest.elf user/envchild.elf user/badptr.elf \
-             user/hardcap.elf
+             user/hardcap.elf user/aafonttest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar
@@ -54,7 +59,11 @@ $(KERNEL): $(OBJ) linker.ld
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-user/%.o: user/%.c user/usys.h user/ulib.h user/ugfx.h include/font8x8.h
+$(FONT_AA): tools/genfont.py
+	python3 tools/genfont.py > $@
+
+user/%.o: user/%.c user/usys.h user/ulib.h user/ugfx.h include/font8x8.h \
+          $(FONT_AA)
 	$(CC) -std=gnu11 -ffreestanding -O2 -Wall -Wextra -Iinclude -c $< -o $@
 
 user/%.elf: user/%.o user/ulib.o user/user.ld
@@ -114,4 +123,4 @@ test-disk: disk
 
 clean:
 	rm -rf $(OBJ) $(KERNEL) $(ISO) $(DISK) $(VHDX) BOOTX64.EFI esp.img \
-	    $(INITRD) isodir user/*.o user/*.elf
+	    $(FONT_AA) $(INITRD) isodir user/*.o user/*.elf
