@@ -627,7 +627,29 @@ void syscall_handle(struct registers *regs) {
     case SYS_WRITEFD: {
         struct file *f = sched_get_fd((int)regs->ebx);
         uint32_t buf = regs->ecx, n = regs->edx;
-        if (!f || n > SYS_WRITE_MAX || !user_range_ok(buf, n, 0)) {
+        if (!f || !user_range_ok(buf, n, 0)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (f->kind == FILE_FB) {
+            /* The framebuffer takes large blits (a whole frame), so it is
+             * exempt from the small per-write cap; clamped to the mapping. */
+            uint8_t *base = fb_base();
+            uint32_t fbbytes = fb_pitch() * fb_height();
+            if (!base) {
+                regs->eax = (uint32_t)-1;
+                return;
+            }
+            uint32_t left = (f->offset < fbbytes) ? fbbytes - f->offset : 0;
+            uint32_t take = n < left ? n : left;
+            const uint8_t *src = (const uint8_t *)buf;
+            for (uint32_t i = 0; i < take; i++)
+                base[f->offset + i] = src[i];
+            f->offset += take;
+            regs->eax = take;
+            return;
+        }
+        if (n > SYS_WRITE_MAX) {
             regs->eax = (uint32_t)-1;
             return;
         }
@@ -644,25 +666,6 @@ void syscall_handle(struct registers *regs) {
         }
         if (f->kind == FILE_NULL || f->kind == FILE_ZERO) {
             regs->eax = n; /* discard, report success */
-            return;
-        }
-        if (f->kind == FILE_FB) {
-            /* Blit raw pixel bytes into the framebuffer at the advancing
-             * offset; a full-frame blit writes from offset 0. Clamped to
-             * the mapped framebuffer so a runaway write can't escape it. */
-            uint8_t *base = fb_base();
-            uint32_t fbbytes = fb_pitch() * fb_height();
-            if (!base) {
-                regs->eax = (uint32_t)-1;
-                return;
-            }
-            uint32_t left = (f->offset < fbbytes) ? fbbytes - f->offset : 0;
-            uint32_t take = n < left ? n : left;
-            const uint8_t *src = (const uint8_t *)buf;
-            for (uint32_t i = 0; i < take; i++)
-                base[f->offset + i] = src[i];
-            f->offset += take;
-            regs->eax = take;
             return;
         }
         if (f->kind != FILE_CONSOLE) {
