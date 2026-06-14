@@ -19,8 +19,11 @@ jobs:
           # image (so the ISO boots on Gen 2 / UEFI VMs); ovmf = UEFI
           # firmware for the UEFI boot tests; gdisk = GPT partitioning and
           # qemu-utils = qemu-img (vhdx) for the Gen 2 disk image.
+          # python3-pil + fonts-dejavu-core generate the anti-aliased UI font
+          # (tools/genfont.py) at build time.
           sudo apt-get install -y nasm xorriso grub-pc-bin grub-efi-amd64-bin \
-            grub-common mtools unzip qemu-system-x86 ovmf gdisk qemu-utils
+            grub-common mtools unzip qemu-system-x86 ovmf gdisk qemu-utils \
+            python3-pil fonts-dejavu-core
 
       - name: Install i686-elf cross-compiler
         run: |

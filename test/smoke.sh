@@ -94,6 +94,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc e n v t e s t dot e l f ret \
                r u n spc b a d p t r dot e l f ret \
                r u n spc h a r d c a p dot e l f ret \
+               r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -583,6 +584,16 @@ if grep -qE "hardcap: ALL PASS \([0-9]+ tests\)" "$SERIAL_LOG"; then
     echo "PASS: hardening capstone all green"
 else
     echo "FAIL: hardening capstone had failures" >&2
+    fail=1
+fi
+
+# Anti-aliased font: aafonttest renders heading text in pure-R orange and
+# counts partial-coverage edge pixels (0 < R < 255), which can only come
+# from alpha blending. A healthy count proves text is genuinely antialiased.
+if grep -q "aafont: antialiased ok" "$SERIAL_LOG"; then
+    echo "PASS: anti-aliased font renders with blended edges"
+else
+    echo "FAIL: AA font missing or not antialiased" >&2
     fail=1
 fi
 
