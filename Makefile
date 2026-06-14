@@ -29,7 +29,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/false.elf user/ulibtest.elf user/sbrktest.elf \
              user/malloctest.elf user/stacktest.elf user/stdiotest.elf \
              user/bigbin.elf user/calc.elf user/kv.elf user/template.elf \
-             user/apptest.elf user/fbtest.elf
+             user/apptest.elf user/fbtest.elf user/ugfxtest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar
@@ -47,7 +47,7 @@ $(KERNEL): $(OBJ) linker.ld
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-user/%.o: user/%.c user/usys.h user/ulib.h
+user/%.o: user/%.c user/usys.h user/ulib.h user/ugfx.h
 	$(CC) -std=gnu11 -ffreestanding -O2 -Wall -Wextra -c $< -o $@
 
 user/%.elf: user/%.o user/ulib.o user/user.ld

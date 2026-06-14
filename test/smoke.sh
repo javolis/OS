@@ -75,6 +75,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r u n t e s t s dot e l f ret \
                r u n spc d e v t e s t dot e l f ret \
                r u n spc f b t e s t dot e l f ret \
+               r u n spc u g f x t e s t dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -462,6 +463,16 @@ if grep -q "fbtest: dev/fb round-trip ok" "$SERIAL_LOG"; then
     echo "PASS: /dev/fb + SYS_FBINFO round-trip"
 else
     echo "FAIL: /dev/fb or SYS_FBINFO misbehaved" >&2
+    fail=1
+fi
+
+# ugfx library: ugfxtest draws into a backbuffer, verifies the exact pixel
+# bytes in memory, then flushes to /dev/fb and reads the first pixel back.
+# The ok line prints only if the backbuffer and the blit both checked out.
+if grep -q "ugfxtest: ok" "$SERIAL_LOG"; then
+    echo "PASS: ugfx draws and flushes to the framebuffer"
+else
+    echo "FAIL: ugfx library misbehaved" >&2
     fail=1
 fi
 
