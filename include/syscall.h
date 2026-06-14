@@ -74,6 +74,9 @@
                          * (empty value clears it). 0 or -1. */
 #define SYS_GETENV 33   /* ebx = name, ecx = buf, edx = max; copies the
                          * value. Returns its length, or -1 if unset. */
+#define SYS_TRYGETKEY 34 /* like getkey but non-blocking: returns the next
+                          * raw key 0..255, or -1 if none is waiting (or not
+                          * foreground). For UI event loops that also tick. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

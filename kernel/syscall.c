@@ -835,6 +835,17 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_TRYGETKEY: {
+        /* Non-blocking single key for UI event loops; -1 if none ready. */
+        if (sched_current_pid() != sched_foreground_pid()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int c = keyboard_trygetchar();
+        regs->eax = (c < 0) ? (uint32_t)-1 : (uint32_t)(unsigned char)c;
+        return;
+    }
+
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
             regs->eax = (uint32_t)-1;

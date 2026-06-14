@@ -185,6 +185,14 @@ static inline int sys_getkey(void) {
     return ret;
 }
 
+/* Non-blocking key read for UI loops: next raw key 0..255, or -1 if none
+ * is waiting. */
+static inline int sys_trygetkey(void) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(34));
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {
