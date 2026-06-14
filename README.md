@@ -125,9 +125,11 @@ It also boots in VirtualBox/VMware and Hyper-V:
   green CI run.
 
 Create a VM with ~128 MB RAM and `os.iso` as the optical drive. You'll
-land at the kernel shell; type `help`, then `run ush.elf` for the
-user-mode shell (pipelines, redirection, history, `run <prog>`), or
-`run gfxdemo.elf` to paint a graphics scene to the framebuffer. If you
+land at the kernel shell; type `help`, then **`run avolis.elf`** for the
+Avolis desktop (lock screen, a positionable taskbar, an applications grid,
+and a `/` command palette - all keyboard-driven, anti-aliased, black and
+orange). Or `run ush.elf` for the user-mode shell, or `run gfxdemo.elf` to
+paint a graphics scene to the framebuffer. If you
 don't want to build the toolchain locally, download the `os-iso` artifact
 from any green [CI run](https://github.com/javolis/OS/actions). CI boots
 the ISO under both BIOS (QEMU) and UEFI (OVMF) to keep both paths working.
