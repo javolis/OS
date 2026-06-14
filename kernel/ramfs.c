@@ -55,6 +55,27 @@ struct ramfs_file *ramfs_create(const char *name) {
     for (int i = 0; i < RAMFS_MAX_FILES; i++) {
         if (!files[i].used) {
             files[i].used = 1;
+            files[i].is_dir = 0;
+            copy_name(files[i].name, name);
+            files[i].data = NULL;
+            files[i].size = 0;
+            files[i].cap = 0;
+            return &files[i];
+        }
+    }
+    return NULL; /* table full */
+}
+
+struct ramfs_file *ramfs_mkdir(const char *name) {
+    uint32_t len = 0;
+    while (name[len])
+        len++;
+    if (len == 0 || len >= RAMFS_NAME_MAX || ramfs_find(name))
+        return NULL; /* bad name or already exists */
+    for (int i = 0; i < RAMFS_MAX_FILES; i++) {
+        if (!files[i].used) {
+            files[i].used = 1;
+            files[i].is_dir = 1;
             copy_name(files[i].name, name);
             files[i].data = NULL;
             files[i].size = 0;
@@ -111,12 +132,14 @@ int ramfs_unlink(const char *name) {
 void ramfs_list(void) {
     for (int i = 0; i < RAMFS_MAX_FILES; i++)
         if (files[i].used)
-            kprintf("%8lu  %s\n", files[i].size, files[i].name);
+            kprintf("%8lu  %s%s\n", files[i].size, files[i].name,
+                    files[i].is_dir ? "/" : "");
 }
 
-/* Fill *name_out/*size_out for the idx-th used file (0-based). Returns 1
- * if present, 0 if idx is past the last used entry. */
-int ramfs_entry(uint32_t idx, const char **name_out, uint32_t *size_out) {
+/* Fill the idx-th used entry (0-based). Returns 1 if present, 0 if idx is
+ * past the last used entry. */
+int ramfs_entry(uint32_t idx, const char **name_out, uint32_t *size_out,
+                int *is_dir_out) {
     uint32_t i = 0;
     for (int s = 0; s < RAMFS_MAX_FILES; s++) {
         if (!files[s].used)
@@ -124,6 +147,7 @@ int ramfs_entry(uint32_t idx, const char **name_out, uint32_t *size_out) {
         if (i == idx) {
             *name_out = files[s].name;
             *size_out = files[s].size;
+            *is_dir_out = files[s].is_dir;
             return 1;
         }
         i++;

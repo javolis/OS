@@ -530,11 +530,13 @@ void syscall_handle(struct registers *regs) {
                 n_initrd++;
         }
         int kind;
+        int is_dir = 0;
         if ((int)idx < n_initrd) {
             initrd_entry(idx, &name, &size);
             kind = 0;
-        } else if (ramfs_entry(idx - (uint32_t)n_initrd, &name, &size)) {
-            kind = 1;
+        } else if (ramfs_entry(idx - (uint32_t)n_initrd, &name, &size,
+                               &is_dir)) {
+            kind = is_dir ? 2 : 1; /* 2 = ramfs directory */
         } else {
             regs->eax = (uint32_t)-1; /* past the end */
             return;
@@ -771,6 +773,16 @@ void syscall_handle(struct registers *regs) {
         tcp_close();
         regs->eax = 0;
         return;
+
+    case SYS_MKDIR: {
+        char name[RAMFS_NAME_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = ramfs_mkdir(name) ? 0 : (uint32_t)-1;
+        return;
+    }
 
     case SYS_NETINFO: {
         if (!user_range_writable(regs->ebx, sizeof(struct netinfo)) ||

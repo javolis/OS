@@ -4,8 +4,11 @@
 
 void _start(void) {
     struct dirent e;
-    /* uprintf has no width specifiers, so format the columns plainly. */
-    for (int i = 0; sys_readdir(i, &e) == 0; i++)
-        uprintf("%u %c %s\n", e.size, e.kind ? 'w' : 'r', e.name);
+    /* uprintf has no width specifiers, so format the columns plainly.
+     * Type: r = read-only initrd, w = ramfs file, d = ramfs directory. */
+    for (int i = 0; sys_readdir(i, &e) == 0; i++) {
+        char t = e.kind == 0 ? 'r' : (e.kind == 2 ? 'd' : 'w');
+        uprintf("%u %c %s%s\n", e.size, t, e.name, e.kind == 2 ? "/" : "");
+    }
     sys_exit(0);
 }

@@ -111,8 +111,15 @@ static inline int sys_kill(int pid) {
 struct dirent {
     char name[32];
     unsigned int size;
-    unsigned int kind; /* 0 = initrd (read-only), 1 = ramfs */
+    unsigned int kind; /* 0 = initrd (ro), 1 = ramfs file, 2 = ramfs dir */
 };
+
+/* Create a ramfs directory marker. Returns 0, or -1 if it exists/is full. */
+static inline int sys_mkdir(const char *path) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(31), "b"(path));
+    return ret;
+}
 
 /* Enumerate files by index (initrd then ramfs). 0 on success, -1 at end. */
 static inline int sys_readdir(int index, struct dirent *out) {
