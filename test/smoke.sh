@@ -90,6 +90,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc d a t e dot e l f ret \
                r u n spc r a m t e s t dot e l f ret \
                r u n spc a p p e n d t e s t dot e l f ret \
+               r u n spc d i r t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -540,6 +541,15 @@ if grep -q "appendtest: append+unlink ok" "$SERIAL_LOG"; then
     echo "PASS: ramfs append and unlink"
 else
     echo "FAIL: append or unlink misbehaved" >&2
+    fail=1
+fi
+
+# ramfs directories: dirtest makes a directory, writes a file inside it via
+# a slash path, round-trips it, and confirms the dir shows up in readdir.
+if grep -q "dirtest: ok" "$SERIAL_LOG"; then
+    echo "PASS: ramfs directories (mkdir + nested file + readdir)"
+else
+    echo "FAIL: ramfs directories misbehaved" >&2
     fail=1
 fi
 

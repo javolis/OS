@@ -67,12 +67,15 @@
 #define SYS_NETINFO 30  /* ebx = struct netinfo* (writable); fills the IPv4
                          * configuration in host byte order. 0 if networking
                          * is up, -1 if there is no NIC. */
+#define SYS_MKDIR 31    /* ebx = path; create a ramfs directory marker.
+                         * Returns 0, or -1 if it exists or the table is
+                         * full. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
     char name[32];
     uint32_t size;
-    uint32_t kind; /* 0 = initrd (read-only), 1 = ramfs (read/write) */
+    uint32_t kind; /* 0 = initrd (ro), 1 = ramfs file, 2 = ramfs directory */
 };
 
 /* Keep in sync with the userland copy in user/usys.h. */
