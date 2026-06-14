@@ -149,7 +149,9 @@ void shell_run(void) {
     kprintf("Tiny shell ready. Type 'help'.\n");
     for (;;) {
         sched_reap(); /* collect any tasks that exited since last prompt */
+        term_set_color(TERM_GREEN);
         kprintf("> ");
+        term_reset_color();
         readline(line, sizeof(line));
         history_add(line);
 

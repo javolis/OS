@@ -17,7 +17,8 @@ static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
 static volatile uint16_t *const VGA_MEMORY =
     (uint16_t *)(KERNEL_VIRT_BASE + 0xB8000u);
-static const uint8_t VGA_COLOR = 0x0F;
+#define VGA_DEFAULT 0x0F
+static uint8_t vga_attr = VGA_DEFAULT; /* current VGA text attribute */
 static size_t term_row, term_col;
 
 /* ---- framebuffer glyph backend ---- */
@@ -26,6 +27,7 @@ static size_t term_row, term_col;
 static int use_fb;
 static uint32_t fb_cols, fb_rows; /* console size in 8x8 cells */
 static uint32_t cx, cy;           /* cursor cell */
+static uint32_t fb_fg = FB_FG;    /* current framebuffer glyph color */
 
 static inline uint16_t vga_entry(char c, uint8_t color) {
     return (uint16_t)(uint8_t)c | (uint16_t)color << 8;
@@ -44,14 +46,14 @@ static void term_scroll(void) {
         for (size_t x = 0; x < VGA_WIDTH; x++)
             VGA_MEMORY[(y - 1) * VGA_WIDTH + x] = VGA_MEMORY[y * VGA_WIDTH + x];
     for (size_t x = 0; x < VGA_WIDTH; x++)
-        VGA_MEMORY[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = vga_entry(' ', VGA_COLOR);
+        VGA_MEMORY[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = vga_entry(' ', vga_attr);
     term_row = VGA_HEIGHT - 1;
 }
 
 void term_init(void) {
     for (size_t y = 0; y < VGA_HEIGHT; y++)
         for (size_t x = 0; x < VGA_WIDTH; x++)
-            VGA_MEMORY[y * VGA_WIDTH + x] = vga_entry(' ', VGA_COLOR);
+            VGA_MEMORY[y * VGA_WIDTH + x] = vga_entry(' ', vga_attr);
     term_row = 0;
     term_col = 0;
     update_cursor();
@@ -87,7 +89,7 @@ static void fb_putchar(char c) {
     case '\b':
         if (cx > 0) {
             cx--;
-            fb_draw_glyph(cx * 8, cy * 8, ' ', FB_FG, FB_BG);
+            fb_draw_glyph(cx * 8, cy * 8, ' ', fb_fg, FB_BG);
         }
         break;
     case '\t':
@@ -96,7 +98,7 @@ static void fb_putchar(char c) {
             fb_newline();
         break;
     default:
-        fb_draw_glyph(cx * 8, cy * 8, c, FB_FG, FB_BG);
+        fb_draw_glyph(cx * 8, cy * 8, c, fb_fg, FB_BG);
         if (++cx == fb_cols)
             fb_newline();
         break;
@@ -125,7 +127,7 @@ void term_putchar(char c) {
         if (term_col > 0) {
             term_col--;
             VGA_MEMORY[term_row * VGA_WIDTH + term_col] =
-                vga_entry(' ', VGA_COLOR);
+                vga_entry(' ', vga_attr);
         }
         break;
     case '\t':
@@ -134,7 +136,7 @@ void term_putchar(char c) {
             term_newline();
         break;
     default:
-        VGA_MEMORY[term_row * VGA_WIDTH + term_col] = vga_entry(c, VGA_COLOR);
+        VGA_MEMORY[term_row * VGA_WIDTH + term_col] = vga_entry(c, vga_attr);
         if (++term_col == VGA_WIDTH)
             term_newline();
         break;
@@ -145,4 +147,29 @@ void term_putchar(char c) {
 void term_write(const char *s) {
     for (size_t i = 0; s[i]; i++)
         term_putchar(s[i]);
+}
+
+/* Map a TERM_* pixel color to the nearest VGA text attribute (low nibble =
+ * foreground), so coloring works on the legacy text console during early
+ * boot too. Unknown colors fall back to the default light-grey/white. */
+static uint8_t vga_attr_for(uint32_t rgb) {
+    switch (rgb) {
+    case TERM_RED:    return 0x0C;
+    case TERM_GREEN:  return 0x0A;
+    case TERM_CYAN:   return 0x0B;
+    case TERM_YELLOW: return 0x0E;
+    case TERM_WHITE:  return 0x0F;
+    case TERM_GREY:   return 0x07;
+    default:          return VGA_DEFAULT;
+    }
+}
+
+void term_set_color(uint32_t rgb) {
+    fb_fg = rgb;
+    vga_attr = vga_attr_for(rgb);
+}
+
+void term_reset_color(void) {
+    fb_fg = FB_FG;
+    vga_attr = VGA_DEFAULT;
 }

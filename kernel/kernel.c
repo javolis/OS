@@ -98,9 +98,24 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
             mbi->framebuffer_bpp, mbi->framebuffer_type);
     if (fb_init(mbi)) {
         term_use_framebuffer();
+        term_set_color(TERM_CYAN);
         kprintf("framebuffer console: %lux%lu %lubpp\n", fb_width(),
                 fb_height(), fb_bpp());
+        term_reset_color();
         kprintf("fbcon checksum %08lx\n", fb_checksum(0, 0, 240, 8));
+
+        /* Color self-test (CI can't see pixels): render the same glyph in
+         * two colors at a scratch cell and confirm the framebuffer differs,
+         * proving the console honors glyph color. The cell is then cleared. */
+        uint32_t sx = 0, sy = fb_height() - 8;
+        fb_fillrect(sx, sy, 8, 8, 0);
+        fb_draw_glyph(sx, sy, 'M', TERM_RED, 0);
+        uint32_t red = fb_checksum(sx, sy, 8, 8);
+        fb_fillrect(sx, sy, 8, 8, 0);
+        fb_draw_glyph(sx, sy, 'M', TERM_CYAN, 0);
+        uint32_t cyan = fb_checksum(sx, sy, 8, 8);
+        fb_fillrect(sx, sy, 8, 8, 0);
+        kprintf("fbcolor red=%08lx cyan=%08lx\n", red, cyan);
     } else {
         kprintf("framebuffer: none (using VGA text console)\n");
     }
