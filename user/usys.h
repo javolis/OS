@@ -121,6 +121,27 @@ static inline int sys_mkdir(const char *path) {
     return ret;
 }
 
+/* Set a global environment variable (empty value clears it). 0 or -1. */
+static inline int sys_setenv(const char *name, const char *val) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(32), "b"(name), "c"(val)
+                     : "memory");
+    return ret;
+}
+
+/* Copy an environment variable's value into buf. Returns its length, or -1
+ * if unset. */
+static inline int sys_getenv(const char *name, char *buf, int max) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(33), "b"(name), "c"(buf), "d"(max)
+                     : "memory");
+    return ret;
+}
+
 /* Enumerate files by index (initrd then ramfs). 0 on success, -1 at end. */
 static inline int sys_readdir(int index, struct dirent *out) {
     int ret;

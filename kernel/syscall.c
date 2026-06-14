@@ -4,6 +4,7 @@
 
 #include "dhcp.h"
 #include "dns.h"
+#include "env.h"
 #include "fb.h"
 #include "file.h"
 #include "icmp.h"
@@ -781,6 +782,29 @@ void syscall_handle(struct registers *regs) {
             return;
         }
         regs->eax = ramfs_mkdir(name) ? 0 : (uint32_t)-1;
+        return;
+    }
+
+    case SYS_SETENV: {
+        char name[ENV_KEY_MAX], val[ENV_VAL_MAX];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0 ||
+            copy_user_name(regs->ecx, val, sizeof(val)) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)env_set(name, val);
+        return;
+    }
+
+    case SYS_GETENV: {
+        char name[ENV_KEY_MAX];
+        uint32_t buf = regs->ecx, max = regs->edx;
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0 ||
+            max == 0 || max > SYS_WRITE_MAX || !user_range_writable(buf, max)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)env_get(name, (char *)buf, (int)max);
         return;
     }
 
