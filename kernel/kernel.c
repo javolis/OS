@@ -12,6 +12,7 @@
 #include "memlayout.h"
 #include "multiboot.h"
 #include "paging.h"
+#include "pci.h"
 #include "pic.h"
 #include "pmm.h"
 #include "serial.h"
@@ -84,6 +85,10 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         kprintf("PANIC: initrd module missing (check grub.cfg)\n");
         halt_forever();
     }
+
+    /* Enumerate the PCI bus so device drivers (e.g. the NIC) can find their
+     * hardware, BARs and IRQ line. */
+    pci_init();
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs
