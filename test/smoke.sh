@@ -96,6 +96,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc h a r d c a p dot e l f ret \
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
+               r u n spc a v o l i s dot e l f spc t e s t ret \
+               ret q \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -604,6 +606,17 @@ if grep -q "avui: ok" "$SERIAL_LOG"; then
     echo "PASS: Avolis UI primitives render (gradient, panel, button)"
 else
     echo "FAIL: Avolis UI primitives misbehaved" >&2
+    fail=1
+fi
+
+# Avolis shell: the lock screen comes up, Enter unlocks to the desktop, and
+# 'q' quits. CI drives it (run avolis.elf test; Enter; q) and checks the
+# state transitions over serial (it can't see the rendered screens).
+if grep -q "avolis: unlocked" "$SERIAL_LOG" \
+        && grep -q "avolis: bye" "$SERIAL_LOG"; then
+    echo "PASS: Avolis lock screen unlocks to the desktop"
+else
+    echo "FAIL: Avolis shell did not unlock/exit" >&2
     fail=1
 fi
 

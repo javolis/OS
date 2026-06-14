@@ -10,6 +10,7 @@
 
 #define UAFONT_BODY 0
 #define UAFONT_HEAD 1
+#define UAFONT_DISPLAY 2 /* large, e.g. the lock-screen clock */
 
 /* Width in pixels that ua_text would advance for the string at font size fi. */
 static inline int ua_text_width(int fi, const char *s) {

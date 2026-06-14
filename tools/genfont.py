@@ -12,7 +12,7 @@ try:
 except ImportError:
     sys.exit("genfont: Pillow (python3-pil) is required")
 
-SIZES = [18, 32]  # body, heading
+SIZES = [18, 32, 48]  # body, heading, display (e.g. the lock-screen clock)
 FIRST, LAST = 32, 126
 FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
