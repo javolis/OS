@@ -212,6 +212,16 @@ else
     fail=1
 fi
 
+# IPv4: the checksum is the error-prone part, so verify it against the
+# canonical RFC 1071 example (0xB861) deterministically at boot. The send,
+# routing and demux paths are exercised end to end by ICMP ping next.
+if grep -q "ip: checksum self-test ok" "$SERIAL_LOG"; then
+    echo "PASS: IPv4 checksum verified against the RFC 1071 vector"
+else
+    echo "FAIL: IPv4 checksum self-test failed" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then
