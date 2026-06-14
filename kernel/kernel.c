@@ -7,6 +7,7 @@
 #include "idt.h"
 #include "initrd.h"
 #include "io.h"
+#include "ip.h"
 #include "keyboard.h"
 #include "kheap.h"
 #include "kprintf.h"
@@ -96,6 +97,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     if (rtl8139_init() == 0) {
         eth_init();
         arp_init();
+        ip_init();
+        ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }
 
