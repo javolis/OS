@@ -17,9 +17,10 @@ jobs:
           sudo apt-get update
           # grub-pc-bin = BIOS boot image; grub-efi-amd64-bin = UEFI boot
           # image (so the ISO boots on Gen 2 / UEFI VMs); ovmf = UEFI
-          # firmware for the UEFI boot test.
+          # firmware for the UEFI boot tests; gdisk = GPT partitioning and
+          # qemu-utils = qemu-img (vhdx) for the Gen 2 disk image.
           sudo apt-get install -y nasm xorriso grub-pc-bin grub-efi-amd64-bin \
-            grub-common mtools unzip qemu-system-x86 ovmf
+            grub-common mtools unzip qemu-system-x86 ovmf gdisk qemu-utils
 
       - name: Install i686-elf cross-compiler
         run: |
@@ -45,8 +46,23 @@ jobs:
       - name: UEFI boot test (boot ISO under OVMF)
         run: make test-uefi
 
+      - name: Build UEFI disk image (Hyper-V Gen 2)
+        run: make disk
+
+      - name: UEFI disk boot test (boot os.img under OVMF as a hard disk)
+        run: make test-disk
+
+      - name: Build VHDX for Hyper-V Gen 2
+        run: make vhdx
+
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: os-iso
           path: os.iso
+
+      - name: Upload Gen 2 VHDX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-vhdx
+          path: os.vhdx
