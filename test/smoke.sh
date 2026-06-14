@@ -80,6 +80,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc i n p u t d e m o dot e l f ret \
                d d s d q \
                r u n spc g f x c a p dot e l f ret \
+               r u n spc p i n g dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -219,6 +220,17 @@ if grep -q "ip: checksum self-test ok" "$SERIAL_LOG"; then
     echo "PASS: IPv4 checksum verified against the RFC 1071 vector"
 else
     echo "FAIL: IPv4 checksum self-test failed" >&2
+    fail=1
+fi
+
+# ICMP ping: the first full network round-trip from userland. ping.elf
+# sends an echo to the gateway via SYS_PING (which blocks the task until
+# the reply arrives over the RX IRQ) and prints the reply. This exercises
+# IP send/routing, ICMP, the scheduler block/wake wait, and RX demux.
+if grep -q "ping: reply from 10.0.2.2" "$SERIAL_LOG"; then
+    echo "PASS: ICMP ping round-trip to the gateway (userland)"
+else
+    echo "FAIL: ping got no reply" >&2
     fail=1
 fi
 

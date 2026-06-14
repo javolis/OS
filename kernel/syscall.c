@@ -4,6 +4,7 @@
 
 #include "fb.h"
 #include "file.h"
+#include "icmp.h"
 #include "initrd.h"
 #include "io.h"
 #include "keyboard.h"
@@ -706,6 +707,12 @@ void syscall_handle(struct registers *regs) {
         fi->pitch = fb_pitch();
         fi->bpp = fb_bpp();
         regs->eax = 0;
+        return;
+    }
+
+    case SYS_PING: {
+        int ticks = icmp_ping((ipaddr_t)regs->ebx);
+        regs->eax = (ticks < 0) ? (uint32_t)-1 : (uint32_t)(ticks * 10);
         return;
     }
 
