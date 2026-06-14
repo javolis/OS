@@ -18,6 +18,13 @@ uint16_t ip_checksum(const void *data, int len);
  * Returns 0 on success, -1 if the next hop isn't resolved yet. */
 int ip_send(ipaddr_t dst, uint8_t protocol, const void *payload, uint16_t len);
 
+/* Send an IPv4 packet with explicit source/destination addresses and a
+ * given destination MAC, skipping routing and ARP. For DHCP, which has no
+ * address yet and broadcasts (src 0.0.0.0, dst 255.255.255.255, broadcast
+ * MAC). Returns 0 on success. */
+int ip_send_raw(ipaddr_t src, ipaddr_t dst, const uint8_t dst_mac[6],
+                uint8_t protocol, const void *payload, uint16_t len);
+
 /* L4 protocol handler: src is the sender IP; payload/len is the transport
  * segment. Runs in IRQ context. */
 typedef void (*ip_proto_fn)(ipaddr_t src, const uint8_t *payload,

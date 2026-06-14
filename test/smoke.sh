@@ -80,6 +80,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc i n p u t d e m o dot e l f ret \
                d d s d q \
                r u n spc g f x c a p dot e l f ret \
+               r u n spc d h c p dot e l f ret \
                r u n spc p i n g dot e l f ret \
                r u n spc n s l o o k u p dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
@@ -221,6 +222,16 @@ if grep -q "ip: checksum self-test ok" "$SERIAL_LOG"; then
     echo "PASS: IPv4 checksum verified against the RFC 1071 vector"
 else
     echo "FAIL: IPv4 checksum self-test failed" >&2
+    fail=1
+fi
+
+# DHCP: dhcp.elf runs the DISCOVER/OFFER/REQUEST/ACK handshake over UDP
+# broadcast against SLIRP's DHCP server and applies the lease. SLIRP hands
+# out 10.0.2.15, so a bound line with that address proves DHCP works.
+if grep -q "dhcp: bound 10.0.2.15" "$SERIAL_LOG"; then
+    echo "PASS: DHCP obtained a lease (10.0.2.15)"
+else
+    echo "FAIL: DHCP did not bind a lease" >&2
     fail=1
 fi
 

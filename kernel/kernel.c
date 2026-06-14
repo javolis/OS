@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "arp.h"
+#include "dhcp.h"
 #include "fb.h"
 #include "gdt.h"
 #include "icmp.h"
@@ -102,6 +103,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         ip_init();
         icmp_init();
         udp_init();
+        dhcp_init();
         ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }

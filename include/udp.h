@@ -18,3 +18,9 @@ int udp_send(ipaddr_t dst, uint16_t src_port, uint16_t dst_port,
 int udp_request(ipaddr_t dst, uint16_t dst_port, uint16_t src_port,
                 const void *txdata, uint16_t txlen, uint8_t *rxbuf,
                 uint16_t rxmax);
+
+/* Persistently route datagrams arriving on a port to a handler (the UDP
+ * payload, IRQ context). Used by services like DHCP. */
+typedef void (*udp_listener_fn)(ipaddr_t src, const uint8_t *data,
+                                uint16_t len);
+void udp_listen(uint16_t port, udp_listener_fn fn);
