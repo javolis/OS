@@ -97,7 +97,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
-               ret q \
+               ret p p d ret q \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -609,14 +609,16 @@ else
     fail=1
 fi
 
-# Avolis shell: the lock screen comes up, Enter unlocks to the desktop, and
-# 'q' quits. CI drives it (run avolis.elf test; Enter; q) and checks the
-# state transitions over serial (it can't see the rendered screens).
+# Avolis shell: lock -> unlock -> desktop, where 'p' cycles the taskbar to
+# another edge and Enter launches the focused app. CI drives it (Enter, p,
+# p, d, Enter, q) and checks the state transitions over serial.
 if grep -q "avolis: unlocked" "$SERIAL_LOG" \
+        && grep -q "avolis: taskbar left" "$SERIAL_LOG" \
+        && grep -q "avolis: launch " "$SERIAL_LOG" \
         && grep -q "avolis: bye" "$SERIAL_LOG"; then
-    echo "PASS: Avolis lock screen unlocks to the desktop"
+    echo "PASS: Avolis desktop: unlock, positionable taskbar, launch"
 else
-    echo "FAIL: Avolis shell did not unlock/exit" >&2
+    echo "FAIL: Avolis desktop interactions broke" >&2
     fail=1
 fi
 
