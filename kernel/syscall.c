@@ -12,12 +12,14 @@
 #include "keyboard.h"
 #include "kprintf.h"
 #include "memlayout.h"
+#include "net.h"
 #include "paging.h"
 #include "pipe.h"
 #include "pmm.h"
 #include "process.h"
 #include "ramfs.h"
 #include "rtc.h"
+#include "rtl8139.h"
 #include "sched.h"
 #include "serial.h"
 #include "syscall.h"
@@ -769,6 +771,21 @@ void syscall_handle(struct registers *regs) {
         tcp_close();
         regs->eax = 0;
         return;
+
+    case SYS_NETINFO: {
+        if (!user_range_writable(regs->ebx, sizeof(struct netinfo)) ||
+            !rtl8139_present()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct netinfo *ni = (struct netinfo *)regs->ebx;
+        ni->ip = net_ip();
+        ni->gateway = net_gateway();
+        ni->netmask = net_netmask();
+        ni->dns = net_dns();
+        regs->eax = 0;
+        return;
+    }
 
     case SYS_GETKEY: {
         /* One raw key, no echo or line editing. Like readline, only the

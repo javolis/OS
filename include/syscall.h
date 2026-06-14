@@ -64,6 +64,9 @@
 #define SYS_TCP_RECV 28 /* ebx = buf, ecx = max; receives. Returns the byte
                          * count, 0 if the peer closed, or -1. */
 #define SYS_TCP_CLOSE 29 /* close the connection. */
+#define SYS_NETINFO 30  /* ebx = struct netinfo* (writable); fills the IPv4
+                         * configuration in host byte order. 0 if networking
+                         * is up, -1 if there is no NIC. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
@@ -76,6 +79,14 @@ struct dirent {
 struct systime {
     uint16_t year;
     uint8_t month, day, hour, minute, second;
+};
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct netinfo {
+    uint32_t ip;      /* our IPv4 address (host byte order) */
+    uint32_t gateway;
+    uint32_t netmask;
+    uint32_t dns;
 };
 
 /* Keep in sync with the userland copy in user/usys.h. */

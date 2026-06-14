@@ -55,7 +55,12 @@ including the shell, until the wake tick. Faults are isolated: a ring-3
 exception kills only the offending task (text/rodata segments are mapped
 read-only per ELF flags, and syscalls validate user pointers), while
 ring-0 faults still panic with a register dump. Teardown reclaims every
-frame. Userland graphics work end to end: `SYS_FBINFO` reports the
+frame. Networking works end to end: a PCI-enumerated RTL8139 NIC driver
+feeds an Ethernet/ARP/IPv4 stack with ICMP, UDP and a minimal TCP, plus a
+DHCP client, a DNS resolver, and ring-3 tools (`ping`, `nslookup`, `dhcp`,
+`tcpecho`) over socket-style syscalls; blocking network calls yield to the
+scheduler while the RX IRQ delivers replies. Userland graphics work end to
+end: `SYS_FBINFO` reports the
 framebuffer geometry and a `/dev/fb` device file blits raw pixels, on top
 of which a small header-only library (`user/ugfx.h`) offers a double-
 buffered canvas with `putpixel`/`fillrect`/`clear`, 8x8 text (the same
@@ -144,6 +149,31 @@ Programs get argc/argv, a 16 KiB stack, an on-demand heap (`umalloc`), and
 fds 0/1 wired to the console (or to pipes/files when launched with `|`,
 `<`, `>` from a shell). A ring-3 fault kills only your program, not the
 system, so it's safe to experiment.
+
+## Networking
+
+There's a small TCP/IP stack on a RealTek RTL8139 NIC (found by a PCI scan,
+busmastering DMA). The layers are Ethernet, ARP (with a cache), IPv4 (with
+next-hop routing and checksums), ICMP echo, UDP, and a minimal one-at-a-time
+TCP client; a DHCP client configures the address, and a DNS resolver looks
+up names. Receive is interrupt-driven, and blocking network calls yield to
+the scheduler (other tasks run) until the reply arrives, so a `ping` never
+spins the CPU.
+
+Ring-3 programs reach it through socket-style syscalls (`sys_ping`,
+`sys_resolve`, `sys_dhcp`, `sys_tcp_connect`/`_send`/`_recv`/`_close`,
+`sys_netinfo`; see `user/usys.h`). The bundled tools:
+
+```
+run dhcp.elf            # obtain a DHCP lease
+run ping.elf 10.0.2.2   # ICMP echo (defaults to the gateway)
+run nslookup.elf example.com
+run tcpecho.elf         # TCP round-trip to an echo server
+run netcap.elf          # capstone: DHCP + ping + DNS + TCP self-test
+```
+
+In QEMU, networking uses the built-in user-mode (SLIRP) network by default
+(`-netdev user -device rtl8139`); the same NIC model works in other VMs.
 
 ## References
 
