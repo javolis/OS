@@ -15,6 +15,7 @@
 #include "pci.h"
 #include "pic.h"
 #include "pmm.h"
+#include "rtl8139.h"
 #include "serial.h"
 #include "process.h"
 #include "sched.h"
@@ -87,8 +88,9 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     }
 
     /* Enumerate the PCI bus so device drivers (e.g. the NIC) can find their
-     * hardware, BARs and IRQ line. */
+     * hardware, BARs and IRQ line, then bring up the network card. */
     pci_init();
+    rtl8139_init();
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs

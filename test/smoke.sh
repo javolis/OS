@@ -181,6 +181,16 @@ else
     fail=1
 fi
 
+# RTL8139 driver: init resets the NIC and reads its MAC over the I/O BAR.
+# QEMU's default NIC MAC starts with the 52:54:00 QEMU OUI, so a matching
+# MAC line proves register access and driver bring-up.
+if grep -qi "rtl8139: MAC 52:54:00" "$SERIAL_LOG"; then
+    echo "PASS: RTL8139 driver initialized and read its MAC"
+else
+    echo "FAIL: RTL8139 driver did not initialize" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then
