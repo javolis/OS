@@ -148,6 +148,15 @@ static inline int sys_fbinfo(struct fbinfo *out) {
     return ret;
 }
 
+/* Read one raw key (no echo or line editing); foreground process only.
+ * Returns 0..255, or -1 if not the foreground task. Blocks until a key
+ * arrives. Arrow keys arrive as 0x80 (up) / 0x81 (down). */
+static inline int sys_getkey(void) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(22));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;
