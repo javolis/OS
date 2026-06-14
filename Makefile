@@ -41,7 +41,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/ping.elf user/nslookup.elf user/dhcp.elf \
              user/tcpecho.elf user/netcap.elf user/dirtest.elf \
              user/envtest.elf user/envchild.elf user/badptr.elf \
-             user/hardcap.elf user/aafonttest.elf
+             user/hardcap.elf user/aafonttest.elf user/avuitest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar

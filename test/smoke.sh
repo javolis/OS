@@ -95,6 +95,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc b a d p t r dot e l f ret \
                r u n spc h a r d c a p dot e l f ret \
                r u n spc a a f o n t t e s t dot e l f ret \
+               r u n spc a v u i t e s t dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -594,6 +595,15 @@ if grep -q "aafont: antialiased ok" "$SERIAL_LOG"; then
     echo "PASS: anti-aliased font renders with blended edges"
 else
     echo "FAIL: AA font missing or not antialiased" >&2
+    fail=1
+fi
+
+# Avolis UI primitives: avuitest draws a gradient, a focused panel (orange
+# ring) and an orange button, and checks representative pixels.
+if grep -q "avui: ok" "$SERIAL_LOG"; then
+    echo "PASS: Avolis UI primitives render (gradient, panel, button)"
+else
+    echo "FAIL: Avolis UI primitives misbehaved" >&2
     fail=1
 fi
 

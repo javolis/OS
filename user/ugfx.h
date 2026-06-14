@@ -102,6 +102,77 @@ static inline void ugfx_clear(ugfx_t *g, unsigned rgb) {
     ugfx_fillrect(g, 0, 0, (int)g->width, (int)g->height, rgb);
 }
 
+/* Outline rectangle of thickness t. */
+static inline void ugfx_rect(ugfx_t *g, int x, int y, int w, int h, int t,
+                             unsigned rgb) {
+    ugfx_fillrect(g, x, y, w, t, rgb);
+    ugfx_fillrect(g, x, y + h - t, w, t, rgb);
+    ugfx_fillrect(g, x, y, t, h, rgb);
+    ugfx_fillrect(g, x + w - t, y, t, h, rgb);
+}
+
+/* Translucent filled rectangle: blend rgb over the surface at opacity a
+ * (0..255). For dim overlays and soft panels. */
+static inline void ugfx_blend_rect(ugfx_t *g, int x, int y, int w, int h,
+                                   unsigned rgb, unsigned a) {
+    for (int yy = y; yy < y + h; yy++)
+        for (int xx = x; xx < x + w; xx++)
+            ugfx_blend_pixel(g, xx, yy, rgb, a);
+}
+
+/* Vertical gradient from top to bot down the rectangle. */
+static inline void ugfx_vgradient(ugfx_t *g, int x, int y, int w, int h,
+                                  unsigned top, unsigned bot) {
+    int tr = (top >> 16) & 0xFF, tg = (top >> 8) & 0xFF, tb = top & 0xFF;
+    int dr = (int)((bot >> 16) & 0xFF) - tr, dg = (int)((bot >> 8) & 0xFF) - tg,
+        db = (int)(bot & 0xFF) - tb;
+    int denom = h > 1 ? h - 1 : 1;
+    for (int yy = 0; yy < h; yy++) {
+        unsigned r = (unsigned)(tr + dr * yy / denom);
+        unsigned gg = (unsigned)(tg + dg * yy / denom);
+        unsigned b = (unsigned)(tb + db * yy / denom);
+        ugfx_fillrect(g, x, y + yy, w, 1, (r << 16) | (gg << 8) | b);
+    }
+}
+
+/* Filled rounded rectangle with anti-aliased corners (integer 4x4
+ * supersampling, no floating point - the kernel saves no FPU state). */
+static inline void ugfx_round_rect(ugfx_t *g, int x, int y, int w, int h,
+                                   int rad, unsigned rgb) {
+    if (rad < 0)
+        rad = 0;
+    if (rad * 2 > w)
+        rad = w / 2;
+    if (rad * 2 > h)
+        rad = h / 2;
+    ugfx_fillrect(g, x + rad, y, w - 2 * rad, h, rgb);      /* middle band */
+    ugfx_fillrect(g, x, y + rad, rad, h - 2 * rad, rgb);    /* left edge */
+    ugfx_fillrect(g, x + w - rad, y + rad, rad, h - 2 * rad, rgb); /* right */
+    if (rad == 0)
+        return;
+    int r2 = (rad * 8) * (rad * 8); /* radius^2 in eighth-pixel units */
+    /* corner centers (pixel coords) */
+    int cx[4] = {x + rad, x + w - rad, x + rad, x + w - rad};
+    int cy[4] = {y + rad, y + rad, y + h - rad, y + h - rad};
+    int ox[4] = {x, x + w - rad, x, x + w - rad};
+    int oy[4] = {y, y, y + h - rad, y + h - rad};
+    for (int c = 0; c < 4; c++)
+        for (int py = 0; py < rad; py++)
+            for (int px = 0; px < rad; px++) {
+                int inside = 0;
+                for (int sj = 0; sj < 4; sj++)
+                    for (int si = 0; si < 4; si++) {
+                        int dx = (ox[c] + px) * 8 + (2 * si + 1) - cx[c] * 8;
+                        int dy = (oy[c] + py) * 8 + (2 * sj + 1) - cy[c] * 8;
+                        if (dx * dx + dy * dy <= r2)
+                            inside++;
+                    }
+                if (inside)
+                    ugfx_blend_pixel(g, ox[c] + px, oy[c] + py, rgb,
+                                     (unsigned)(inside * 255 / 16));
+            }
+}
+
 /* Blit the whole backbuffer to /dev/fb. Returns 0 on success, -1 otherwise.
  * Re-opens the device each call so the write starts at offset 0. */
 static inline int ugfx_flush(ugfx_t *g) {
