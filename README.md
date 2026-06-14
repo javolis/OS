@@ -108,7 +108,8 @@ UEFI), so it works on both firmware types:
 
 Create a VM with ~128 MB RAM and `os.iso` as the optical drive. You'll
 land at the kernel shell; type `help`, then `run ush.elf` for the
-user-mode shell (pipelines, redirection, history, `run <prog>`). If you
+user-mode shell (pipelines, redirection, history, `run <prog>`), or
+`run gfxdemo.elf` to paint a graphics scene to the framebuffer. If you
 don't want to build the toolchain locally, download the `os-iso` artifact
 from any green [CI run](https://github.com/javolis/OS/actions). CI boots
 the ISO under both BIOS (QEMU) and UEFI (OVMF) to keep both paths working.
