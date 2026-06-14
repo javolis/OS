@@ -55,7 +55,14 @@ including the shell, until the wake tick. Faults are isolated: a ring-3
 exception kills only the offending task (text/rodata segments are mapped
 read-only per ELF flags, and syscalls validate user pointers), while
 ring-0 faults still panic with a register dump. Teardown reclaims every
-frame.
+frame. Userland graphics work end to end: `SYS_FBINFO` reports the
+framebuffer geometry and a `/dev/fb` device file blits raw pixels, on top
+of which a small header-only library (`user/ugfx.h`) offers a double-
+buffered canvas with `putpixel`/`fillrect`/`clear`, 8x8 text (the same
+font the console uses), and a one-pass `flush`; `SYS_GETKEY` delivers raw
+keystrokes for interactive programs. Demos: `gfxdemo.elf` paints a
+composed scene and `inputdemo.elf` steers a box with w/a/s/d (CI verifies
+both over serial via pixel read-back, since it can't see the screen).
 
 ## Prerequisites (Linux dev host)
 
