@@ -1,17 +1,20 @@
-/* fb.h - linear framebuffer (32bpp RGB) provided by the bootloader. */
+/* fb.h - linear framebuffer (24/32bpp direct RGB) provided by the
+ * bootloader. */
 #pragma once
 #include <stdint.h>
 
 struct multiboot_info;
 
-/* Parse and map the bootloader framebuffer. Returns 1 if a usable 32bpp
- * RGB framebuffer is available, 0 otherwise (caller falls back to VGA). */
+/* Parse and map the bootloader framebuffer. Returns 1 if a usable direct
+ * RGB framebuffer (24 or 32 bpp) is available, 0 otherwise (caller falls
+ * back to VGA). */
 int fb_init(const struct multiboot_info *mbi);
 
 int fb_available(void);
 uint32_t fb_width(void);
 uint32_t fb_height(void);
 uint32_t fb_pitch(void); /* bytes per scanline */
+uint32_t fb_bpp(void);   /* bits per pixel: 24 or 32 */
 uint8_t *fb_base(void);  /* mapped kernel VA, or NULL */
 
 void fb_putpixel(uint32_t x, uint32_t y, uint32_t rgb);

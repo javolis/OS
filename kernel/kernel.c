@@ -98,8 +98,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
             mbi->framebuffer_bpp, mbi->framebuffer_type);
     if (fb_init(mbi)) {
         term_use_framebuffer();
-        kprintf("framebuffer console: %lux%lu 32bpp\n", fb_width(),
-                fb_height());
+        kprintf("framebuffer console: %lux%lu %lubpp\n", fb_width(),
+                fb_height(), fb_bpp());
         kprintf("fbcon checksum %08lx\n", fb_checksum(0, 0, 240, 8));
     } else {
         kprintf("framebuffer: none (using VGA text console)\n");
