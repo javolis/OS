@@ -79,6 +79,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc g f x d e m o dot e l f ret \
                r u n spc i n p u t d e m o dot e l f ret \
                d d s d q \
+               r u n spc g f x c a p dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -498,6 +499,16 @@ if grep -q "inputdemo: key " "$SERIAL_LOG" \
     echo "PASS: graphical input loop moved on keypresses (SYS_GETKEY)"
 else
     echo "FAIL: graphical input loop did not respond to keys" >&2
+    fail=1
+fi
+
+# Graphics capstone: one program exercises SYS_FBINFO, /dev/fb, every ugfx
+# primitive (clear/putpixel/fillrect/clipping/text), the flush-to-device
+# path and a raw byte round-trip. ALL PASS prints only if every check did.
+if grep -qE "gfxcap: ALL PASS \([0-9]+ tests\)" "$SERIAL_LOG"; then
+    echo "PASS: graphics capstone all green"
+else
+    echo "FAIL: graphics capstone had failures" >&2
     fail=1
 fi
 

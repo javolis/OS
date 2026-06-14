@@ -30,7 +30,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/malloctest.elf user/stacktest.elf user/stdiotest.elf \
              user/bigbin.elf user/calc.elf user/kv.elf user/template.elf \
              user/apptest.elf user/fbtest.elf user/ugfxtest.elf \
-             user/gfxdemo.elf user/inputdemo.elf
+             user/gfxdemo.elf user/inputdemo.elf user/gfxcap.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar
