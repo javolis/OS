@@ -76,6 +76,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc d e v t e s t dot e l f ret \
                r u n spc f b t e s t dot e l f ret \
                r u n spc u g f x t e s t dot e l f ret \
+               r u n spc g f x d e m o dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -474,6 +475,16 @@ if grep -q "ugfxtest: ok" "$SERIAL_LOG"; then
     echo "PASS: ugfx draws shapes and text and flushes to the framebuffer"
 else
     echo "FAIL: ugfx library misbehaved" >&2
+    fail=1
+fi
+
+# gfxdemo: a composed visual scene (gradient, title, swatches, figure,
+# border). It self-checks the blit by reading its top-left border pixel
+# back from /dev/fb, printing the rendered line only when that matches.
+if grep -q "gfxdemo: rendered" "$SERIAL_LOG"; then
+    echo "PASS: gfxdemo composed and rendered a scene"
+else
+    echo "FAIL: gfxdemo did not render" >&2
     fail=1
 fi
 
