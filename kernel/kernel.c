@@ -4,6 +4,7 @@
 #include "arp.h"
 #include "fb.h"
 #include "gdt.h"
+#include "icmp.h"
 #include "idt.h"
 #include "initrd.h"
 #include "io.h"
@@ -98,6 +99,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         eth_init();
         arp_init();
         ip_init();
+        icmp_init();
         ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }

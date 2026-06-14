@@ -157,6 +157,14 @@ static inline int sys_getkey(void) {
     return ret;
 }
 
+/* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
+ * and wait for the reply. Returns the round-trip time in ms, or -1. */
+static inline int sys_ping(unsigned int ip) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(23), "b"(ip));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

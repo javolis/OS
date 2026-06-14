@@ -48,6 +48,9 @@
                          * Returns 0..255, or -1 if not foreground. For
                          * interactive graphics (KEY_UP/DOWN come through as
                          * 0x80/0x81). */
+#define SYS_PING 23     /* ebx = IPv4 address in host byte order; sends an
+                         * ICMP echo and waits. Returns the round-trip time
+                         * in milliseconds, or -1 on timeout. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
