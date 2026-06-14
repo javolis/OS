@@ -90,10 +90,16 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
      * that lack VGA text). Early boot lines above this point went to VGA
      * text + serial; from here output is drawn with the 8x8 font. CI can't
      * see pixels, so log geometry + a checksum over the rendered banner. */
+    /* Dump exactly what the bootloader handed over, so a 'none' below is
+     * diagnosable from the serial log alone (CI can't inspect the VM). */
+    kprintf("mb: flags=%08lx fbaddr=%08lx %lux%lu pitch=%lu bpp=%u type=%u\n",
+            mbi->flags, (uint32_t)mbi->framebuffer_addr, mbi->framebuffer_width,
+            mbi->framebuffer_height, mbi->framebuffer_pitch,
+            mbi->framebuffer_bpp, mbi->framebuffer_type);
     if (fb_init(mbi)) {
         term_use_framebuffer();
-        kprintf("framebuffer console: %lux%lu 32bpp\n", fb_width(),
-                fb_height());
+        kprintf("framebuffer console: %lux%lu %lubpp\n", fb_width(),
+                fb_height(), fb_bpp());
         kprintf("fbcon checksum %08lx\n", fb_checksum(0, 0, 240, 8));
     } else {
         kprintf("framebuffer: none (using VGA text console)\n");

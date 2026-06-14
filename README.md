@@ -99,12 +99,19 @@ make run                              # QEMU (what CI uses)
 qemu-system-i386 -cdrom os.iso        # QEMU directly
 ```
 
-It also boots in VirtualBox/VMware — create a VM (other/unknown OS, ~128 MB
-RAM) with `os.iso` as the optical drive. You'll land at the kernel shell;
-type `help`, then `run ush.elf` for the user-mode shell (pipelines,
-redirection, history, `run <prog>`). If you don't want to build the
-toolchain locally, download the `os-iso` artifact from any green
-[CI run](https://github.com/javolis/OS/actions).
+It also boots in VirtualBox/VMware and Hyper-V. The ISO is hybrid (BIOS +
+UEFI), so it works on both firmware types:
+
+- **Hyper-V Generation 1** (BIOS): works out of the box.
+- **Hyper-V Generation 2** (UEFI): turn off Settings → Security → *Enable
+  Secure Boot* first (our bootloader isn't Microsoft-signed).
+
+Create a VM with ~128 MB RAM and `os.iso` as the optical drive. You'll
+land at the kernel shell; type `help`, then `run ush.elf` for the
+user-mode shell (pipelines, redirection, history, `run <prog>`). If you
+don't want to build the toolchain locally, download the `os-iso` artifact
+from any green [CI run](https://github.com/javolis/OS/actions). CI boots
+the ISO under both BIOS (QEMU) and UEFI (OVMF) to keep both paths working.
 
 ## Writing your own app
 

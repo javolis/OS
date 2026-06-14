@@ -15,7 +15,11 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm xorriso grub-pc-bin grub-common mtools unzip qemu-system-x86
+          # grub-pc-bin = BIOS boot image; grub-efi-amd64-bin = UEFI boot
+          # image (so the ISO boots on Gen 2 / UEFI VMs); ovmf = UEFI
+          # firmware for the UEFI boot test.
+          sudo apt-get install -y nasm xorriso grub-pc-bin grub-efi-amd64-bin \
+            grub-common mtools unzip qemu-system-x86 ovmf
 
       - name: Install i686-elf cross-compiler
         run: |
@@ -35,8 +39,11 @@ jobs:
       - name: Build bootable ISO
         run: make iso
 
-      - name: Smoke test (boot ISO in QEMU)
+      - name: Smoke test (boot ISO in QEMU, BIOS)
         run: make test
+
+      - name: UEFI boot test (boot ISO under OVMF)
+        run: make test-uefi
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
