@@ -57,6 +57,13 @@
 #define SYS_DHCP 25     /* run the DHCP handshake and apply the lease.
                          * Returns the leased IPv4 address (host order), or
                          * 0 on failure. */
+#define SYS_TCP_CONNECT 26 /* ebx = IPv4 (host order), ecx = port; opens a
+                            * TCP connection. 0 on success, -1 otherwise. */
+#define SYS_TCP_SEND 27 /* ebx = buf, ecx = len; sends on the connection.
+                         * Returns bytes queued, or -1. */
+#define SYS_TCP_RECV 28 /* ebx = buf, ecx = max; receives. Returns the byte
+                         * count, 0 if the peer closed, or -1. */
+#define SYS_TCP_CLOSE 29 /* close the connection. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

@@ -17,11 +17,32 @@ set -uo pipefail
 ISO="${1:-os.iso}"
 MARKER="KERNEL_BOOT_OK"
 SERIAL_LOG="$(mktemp)"
-trap 'rm -f "$SERIAL_LOG"' EXIT
+ECHO_PID=""
+trap 'rm -f "$SERIAL_LOG"; [ -n "$ECHO_PID" ] && kill "$ECHO_PID" 2>/dev/null' EXIT
 
 if [ ! -f "$ISO" ]; then
     echo "FAIL: ISO not found: $ISO" >&2
     exit 1
+fi
+
+# Host TCP echo server for the guest TCP test. The guest reaches it through
+# SLIRP guestfwd at 10.0.2.100:9, which QEMU forwards to 127.0.0.1:12345.
+if command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import socket
+s=socket.socket()
+s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+s.bind(('127.0.0.1',12345))
+s.listen(1)
+while True:
+    c,a=s.accept()
+    while True:
+        d=c.recv(1024)
+        if not d: break
+        c.sendall(d)
+    c.close()
+" &
+    ECHO_PID=$!
 fi
 
 echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
@@ -83,6 +104,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc d h c p dot e l f ret \
                r u n spc p i n g dot e l f ret \
                r u n spc n s l o o k u p dot e l f ret \
+               r u n spc t c p e c h o dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -104,7 +126,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
         -display none \
         -serial "file:$SERIAL_LOG" \
         -monitor stdio \
-        -netdev user,id=net0 \
+        -netdev user,id=net0,guestfwd=tcp:10.0.2.100:9-tcp:127.0.0.1:12345 \
         -device rtl8139,netdev=net0 \
         -no-reboot >/dev/null 2>&1
 
@@ -254,6 +276,16 @@ if grep -qE "udp: rx [0-9]+ bytes from 10.0.2.3:53" "$SERIAL_LOG"; then
     echo "PASS: UDP round-trip with the DNS server (DNS query/reply)"
 else
     echo "FAIL: no UDP reply from the DNS server" >&2
+    fail=1
+fi
+
+# TCP: tcpecho opens a connection to a host echo server (reached via SLIRP
+# guestfwd at 10.0.2.100:9), sends a line and verifies the echo. This needs
+# the full handshake, sequence/ack tracking and the pseudo-header checksum.
+if grep -q "tcp: echo ok" "$SERIAL_LOG"; then
+    echo "PASS: TCP connect/send/recv echo round-trip"
+else
+    echo "FAIL: TCP echo did not round-trip" >&2
     fail=1
 fi
 
