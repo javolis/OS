@@ -25,6 +25,7 @@
 #include "process.h"
 #include "sched.h"
 #include "shell.h"
+#include "tcp.h"
 #include "term.h"
 #include "timer.h"
 #include "udp.h"
@@ -104,6 +105,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         icmp_init();
         udp_init();
         dhcp_init();
+        tcp_init();
         ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }

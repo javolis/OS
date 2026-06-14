@@ -21,6 +21,7 @@
 #include "sched.h"
 #include "serial.h"
 #include "syscall.h"
+#include "tcp.h"
 #include "term.h"
 #include "timer.h"
 
@@ -737,6 +738,36 @@ void syscall_handle(struct registers *regs) {
 
     case SYS_DHCP:
         regs->eax = (uint32_t)dhcp_run();
+        return;
+
+    case SYS_TCP_CONNECT:
+        regs->eax =
+            (uint32_t)tcp_connect((ipaddr_t)regs->ebx, (uint16_t)regs->ecx);
+        return;
+
+    case SYS_TCP_SEND: {
+        uint32_t buf = regs->ebx, len = regs->ecx;
+        if (len > SYS_WRITE_MAX || !user_range_ok(buf, len, 0)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)tcp_send((const void *)buf, (uint16_t)len);
+        return;
+    }
+
+    case SYS_TCP_RECV: {
+        uint32_t buf = regs->ebx, max = regs->ecx;
+        if (max > 4096 || !user_range_writable(buf, max)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)tcp_recv((uint8_t *)buf, (uint16_t)max);
+        return;
+    }
+
+    case SYS_TCP_CLOSE:
+        tcp_close();
+        regs->eax = 0;
         return;
 
     case SYS_GETKEY: {

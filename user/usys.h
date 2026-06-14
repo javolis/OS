@@ -184,6 +184,34 @@ static inline unsigned int sys_dhcp(void) {
     return ret;
 }
 
+/* TCP client (one connection at a time). */
+static inline int sys_tcp_connect(unsigned int ip, int port) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(26), "b"(ip), "c"(port));
+    return ret;
+}
+static inline int sys_tcp_send(const void *buf, int len) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(27), "b"(buf), "c"(len)
+                     : "memory");
+    return ret;
+}
+static inline int sys_tcp_recv(void *buf, int max) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(28), "b"(buf), "c"(max)
+                     : "memory");
+    return ret;
+}
+static inline int sys_tcp_close(void) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(29));
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;
