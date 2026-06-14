@@ -93,6 +93,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc d i r t e s t dot e l f ret \
                r u n spc e n v t e s t dot e l f ret \
                r u n spc b a d p t r dot e l f ret \
+               r u n spc h a r d c a p dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -572,6 +573,16 @@ if grep -q "badptr: all hostile pointers rejected" "$SERIAL_LOG"; then
     echo "PASS: syscalls reject hostile user pointers without faulting"
 else
     echo "FAIL: a syscall mishandled a hostile pointer" >&2
+    fail=1
+fi
+
+# Hardening capstone: one program rolls up ramfs directories, the
+# environment, and hostile-pointer rejection. ALL PASS only if every
+# robustness feature from this batch holds together.
+if grep -qE "hardcap: ALL PASS \([0-9]+ tests\)" "$SERIAL_LOG"; then
+    echo "PASS: hardening capstone all green"
+else
+    echo "FAIL: hardening capstone had failures" >&2
     fail=1
 fi
 

@@ -109,14 +109,20 @@ Makefile     build orchestration
 ```sh
 make run                              # QEMU (what CI uses)
 qemu-system-i386 -cdrom os.iso        # QEMU directly
+make disk                             # os.img: a UEFI-bootable GPT disk
+make vhdx                             # os.vhdx for Hyper-V Generation 2
 ```
 
-It also boots in VirtualBox/VMware and Hyper-V. The ISO is hybrid (BIOS +
-UEFI), so it works on both firmware types:
+It also boots in VirtualBox/VMware and Hyper-V:
 
-- **Hyper-V Generation 1** (BIOS): works out of the box.
-- **Hyper-V Generation 2** (UEFI): turn off Settings → Security → *Enable
-  Secure Boot* first (our bootloader isn't Microsoft-signed).
+- **Hyper-V Generation 1** (BIOS): attach `os.iso` as the optical drive —
+  works out of the box.
+- **Hyper-V Generation 2** (UEFI): Microsoft's firmware doesn't accept the
+  ISO's UEFI boot image, so attach **`os.vhdx`** as the boot hard disk
+  instead, and turn off Settings → Security → *Enable Secure Boot* (our
+  bootloader isn't Microsoft-signed). CI verifies this disk boots under
+  OVMF. Both `os.iso` and `os.vhdx` are downloadable as artifacts from any
+  green CI run.
 
 Create a VM with ~128 MB RAM and `os.iso` as the optical drive. You'll
 land at the kernel shell; type `help`, then `run ush.elf` for the
