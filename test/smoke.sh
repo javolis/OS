@@ -135,22 +135,16 @@ else
     fail=1
 fi
 
-# Framebuffer console: GRUB should provide a linear 32bpp surface (QEMU's
-# VGA supports it); the kernel switches the console to it and renders the
-# banner with the 8x8 font. A non-zero checksum over the banner region
-# proves glyphs were drawn. A text-only setup logs 'none' (VGA fallback),
-# which is also acceptable.
-if grep -q "framebuffer console:" "$SERIAL_LOG"; then
-    if grep -qE "fbcon checksum 00000000$" "$SERIAL_LOG"; then
-        echo "FAIL: framebuffer console drew nothing (zero checksum)" >&2
-        fail=1
-    else
-        echo "PASS: framebuffer console renders glyphs (non-zero checksum)"
-    fi
-elif grep -q "framebuffer: none" "$SERIAL_LOG"; then
-    echo "PASS: no framebuffer; VGA text fallback (acceptable)"
+# Framebuffer console: GRUB (configured for graphics in grub.cfg) hands
+# the kernel a linear 32bpp surface; the kernel switches the console to it
+# and renders the banner with the 8x8 font. Require it - a 'none' here
+# means the graphics handoff regressed and the console would be invisible
+# on UEFI.
+if grep -q "framebuffer console:" "$SERIAL_LOG" &&
+        ! grep -qE "fbcon checksum 00000000$" "$SERIAL_LOG"; then
+    echo "PASS: framebuffer console renders glyphs (non-zero checksum)"
 else
-    echo "FAIL: no framebuffer status reported" >&2
+    echo "FAIL: no working framebuffer console (graphics handoff regressed)" >&2
     fail=1
 fi
 
