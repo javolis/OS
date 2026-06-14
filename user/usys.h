@@ -131,6 +131,23 @@ static inline void *sys_sbrk(int incr) {
     return ret;
 }
 
+/* Keep in sync with the kernel's struct fbinfo in include/syscall.h. */
+struct fbinfo {
+    unsigned int width;  /* pixels */
+    unsigned int height; /* pixels */
+    unsigned int pitch;  /* bytes per scanline */
+    unsigned int bpp;    /* bits per pixel: 24 or 32 */
+};
+
+/* Query the framebuffer geometry. Returns 0 if a framebuffer is present
+ * (then open "/dev/fb" and writefd raw pixel bytes to it), -1 if the boot
+ * console is VGA text only. */
+static inline int sys_fbinfo(struct fbinfo *out) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(21), "b"(out) : "memory");
+    return ret;
+}
+
 /* Returns bytes read; 0 at EOF. fd 0 reads one edited keyboard line. */
 static inline int sys_read(int fd, char *buf, int n) {
     int ret;

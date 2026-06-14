@@ -74,6 +74,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
                r u n spc r u n t e s t s dot e l f ret \
                r u n spc d e v t e s t dot e l f ret \
+               r u n spc f b t e s t dot e l f ret \
                r u n spc c o r e t e s t dot e l f ret \
                r u n spc u l i b t e s t dot e l f ret \
                r u n spc s b r k t e s t dot e l f ret \
@@ -451,6 +452,16 @@ if grep -q "devtest: dev files ok" "$SERIAL_LOG"; then
     echo "PASS: /dev/null and /dev/zero behave"
 else
     echo "FAIL: device files misbehaved" >&2
+    fail=1
+fi
+
+# Framebuffer device + SYS_FBINFO: fbtest queries the geometry, then writes
+# a known byte pattern to /dev/fb and reads it back through a fresh fd. The
+# round-trip line only prints when both directions moved the exact bytes.
+if grep -q "fbtest: dev/fb round-trip ok" "$SERIAL_LOG"; then
+    echo "PASS: /dev/fb + SYS_FBINFO round-trip"
+else
+    echo "FAIL: /dev/fb or SYS_FBINFO misbehaved" >&2
     fail=1
 fi
 
