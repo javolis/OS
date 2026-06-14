@@ -92,6 +92,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a p p e n d t e s t dot e l f ret \
                r u n spc d i r t e s t dot e l f ret \
                r u n spc e n v t e s t dot e l f ret \
+               r u n spc b a d p t r dot e l f ret \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -560,6 +561,17 @@ if grep -q "envchild: GREETING=hello-env" "$SERIAL_LOG"; then
     echo "PASS: environment variable inherited across spawn"
 else
     echo "FAIL: environment not inherited" >&2
+    fail=1
+fi
+
+# Syscall hardening: badptr throws kernel-space/NULL/unmapped pointers at
+# every pointer-taking syscall. Each must be rejected with -1 - and crucially
+# the kernel must not fault on any of them (a ring-0 fault would panic and
+# kill this whole run). Reaching this line proves user pointers are validated.
+if grep -q "badptr: all hostile pointers rejected" "$SERIAL_LOG"; then
+    echo "PASS: syscalls reject hostile user pointers without faulting"
+else
+    echo "FAIL: a syscall mishandled a hostile pointer" >&2
     fail=1
 fi
 
