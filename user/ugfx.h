@@ -12,6 +12,8 @@
 #pragma once
 #include "ulib.h"
 
+#include "font8x8.h" /* shared 8x8 bitmap font (compiled with -Iinclude) */
+
 typedef struct {
     int ok;                 /* 1 once a framebuffer is available */
     unsigned width, height; /* pixels */
@@ -90,6 +92,63 @@ static inline int ugfx_flush(ugfx_t *g) {
     }
     sys_close(fd);
     return (off == total) ? 0 : -1;
+}
+
+/* Draw one 8x8 glyph at pixel (x,y) in color rgb. "Off" pixels are left
+ * untouched (transparent), so text overlays whatever is already drawn. */
+static inline void ugfx_char(ugfx_t *g, int x, int y, char c, unsigned rgb) {
+    unsigned char uc = (unsigned char)c;
+    if (uc < FONT_FIRST || uc > FONT_LAST)
+        uc = ' ';
+    const uint8_t *gl = font8x8[uc - FONT_FIRST];
+    for (int row = 0; row < FONT_H; row++) {
+        uint8_t bits = gl[row];
+        for (int col = 0; col < FONT_W; col++)
+            if (bits & (0x80 >> col))
+                ugfx_putpixel(g, x + col, y + row, rgb);
+    }
+}
+
+/* Draw a NUL-terminated string starting at (x,y); 8px per glyph, '\n' wraps
+ * to a new line at the starting x. */
+static inline void ugfx_text(ugfx_t *g, int x, int y, const char *s,
+                             unsigned rgb) {
+    int cx = x, cy = y;
+    for (; *s; s++) {
+        if (*s == '\n') {
+            cx = x;
+            cy += FONT_H;
+            continue;
+        }
+        ugfx_char(g, cx, cy, *s, rgb);
+        cx += FONT_W;
+    }
+}
+
+/* Like ugfx_text, but each font pixel becomes a scale x scale block, for
+ * big titles. scale < 1 is treated as 1. */
+static inline void ugfx_text_scaled(ugfx_t *g, int x, int y, const char *s,
+                                    unsigned rgb, int scale) {
+    if (scale < 1)
+        scale = 1;
+    int cx = x, cy = y;
+    for (; *s; s++) {
+        if (*s == '\n') {
+            cx = x;
+            cy += FONT_H * scale;
+            continue;
+        }
+        unsigned char uc = (unsigned char)*s;
+        if (uc < FONT_FIRST || uc > FONT_LAST)
+            uc = ' ';
+        const uint8_t *gl = font8x8[uc - FONT_FIRST];
+        for (int row = 0; row < FONT_H; row++)
+            for (int col = 0; col < FONT_W; col++)
+                if (gl[row] & (0x80 >> col))
+                    ugfx_fillrect(g, cx + col * scale, cy + row * scale, scale,
+                                  scale, rgb);
+        cx += FONT_W * scale;
+    }
 }
 
 static inline void ugfx_free(ugfx_t *g) {

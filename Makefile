@@ -47,8 +47,8 @@ $(KERNEL): $(OBJ) linker.ld
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-user/%.o: user/%.c user/usys.h user/ulib.h user/ugfx.h
-	$(CC) -std=gnu11 -ffreestanding -O2 -Wall -Wextra -c $< -o $@
+user/%.o: user/%.c user/usys.h user/ulib.h user/ugfx.h include/font8x8.h
+	$(CC) -std=gnu11 -ffreestanding -O2 -Wall -Wextra -Iinclude -c $< -o $@
 
 user/%.elf: user/%.o user/ulib.o user/user.ld
 	$(LD) -ffreestanding -O2 -nostdlib -T user/user.ld -o $@ $< user/ulib.o -lgcc
