@@ -101,6 +101,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
         -display none \
         -serial "file:$SERIAL_LOG" \
         -monitor stdio \
+        -netdev user,id=net0 \
+        -device rtl8139,netdev=net0 \
         -no-reboot >/dev/null 2>&1
 
 echo "----- serial output -----"
@@ -166,6 +168,16 @@ if [ -n "$fbcolor" ] && [ "$red" != "00000000" ] && [ "$cyan" != "00000000" ] \
     echo "PASS: framebuffer console honors color (red=${red} cyan=${cyan})"
 else
     echo "FAIL: console color not honored (${fbcolor:-no fbcolor line})" >&2
+    fail=1
+fi
+
+# PCI enumeration: the bus scan must find the emulated RTL8139 NIC
+# (vendor 10ec, device 8139) that QEMU attaches, proving config-space
+# access and device discovery work.
+if grep -qi "pci: .*10ec:8139" "$SERIAL_LOG"; then
+    echo "PASS: PCI enumeration found the RTL8139 NIC"
+else
+    echo "FAIL: PCI scan did not find the NIC" >&2
     fail=1
 fi
 
