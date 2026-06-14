@@ -202,6 +202,16 @@ else
     fail=1
 fi
 
+# ARP: the kernel requests the gateway's MAC at boot; the reply is parsed
+# and cached. Seeing the gateway (10.0.2.2) learned proves ARP packet
+# parsing and the cache work.
+if grep -q "arp: 10.0.2.2 is " "$SERIAL_LOG"; then
+    echo "PASS: ARP resolved and cached the gateway MAC"
+else
+    echo "FAIL: ARP did not resolve the gateway" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then

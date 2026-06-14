@@ -6,6 +6,12 @@
 #define ETH_TYPE_ARP 0x0806
 #define ETH_TYPE_IPV4 0x0800
 
+/* IPv4 addresses are kept in host byte order; IPV4(a,b,c,d) builds one. */
+typedef uint32_t ipaddr_t;
+#define IPV4(a, b, c, d)                                                       \
+    (((uint32_t)(a) << 24) | ((uint32_t)(b) << 16) | ((uint32_t)(c) << 8) |    \
+     (uint32_t)(d))
+
 /* Host <-> network byte order (this kernel is little-endian x86). */
 static inline uint16_t htons(uint16_t x) {
     return (uint16_t)((x << 8) | (x >> 8));
@@ -45,6 +51,8 @@ typedef void (*eth_proto_fn)(const uint8_t *src_mac, const uint8_t *payload,
                              uint16_t len);
 void net_register(uint16_t ethertype, eth_proto_fn fn);
 
-/* Temporary RX-path probe: broadcast an ARP request for the SLIRP gateway
- * (10.0.2.2). Replaced by the ARP module in the next step. */
-void eth_arp_probe(void);
+/* IP configuration (defaults to the static SLIRP layout; DHCP overrides). */
+ipaddr_t net_ip(void);
+ipaddr_t net_gateway(void);
+ipaddr_t net_netmask(void);
+void net_set_config(ipaddr_t ip, ipaddr_t gw, ipaddr_t mask);

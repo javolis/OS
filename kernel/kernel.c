@@ -1,6 +1,7 @@
 /* kernel.c — freestanding kernel entry. */
 #include <stdint.h>
 
+#include "arp.h"
 #include "fb.h"
 #include "gdt.h"
 #include "idt.h"
@@ -94,7 +95,8 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     pci_init();
     if (rtl8139_init() == 0) {
         eth_init();
-        eth_arp_probe(); /* elicit an ARP reply to prove the RX path */
+        arp_init();
+        arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch

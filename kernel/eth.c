@@ -15,6 +15,26 @@ const uint8_t eth_broadcast[ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 static uint8_t our_mac[ETH_ALEN];
 
+/* IP config: defaults match QEMU's SLIRP layout; DHCP overrides later. */
+static ipaddr_t cfg_ip = IPV4(10, 0, 2, 15);
+static ipaddr_t cfg_gw = IPV4(10, 0, 2, 2);
+static ipaddr_t cfg_mask = IPV4(255, 255, 255, 0);
+
+ipaddr_t net_ip(void) {
+    return cfg_ip;
+}
+ipaddr_t net_gateway(void) {
+    return cfg_gw;
+}
+ipaddr_t net_netmask(void) {
+    return cfg_mask;
+}
+void net_set_config(ipaddr_t ip, ipaddr_t gw, ipaddr_t mask) {
+    cfg_ip = ip;
+    cfg_gw = gw;
+    cfg_mask = mask;
+}
+
 #define MAX_PROTO 4
 static struct {
     uint16_t type;
@@ -73,32 +93,4 @@ void net_register(uint16_t ethertype, eth_proto_fn fn) {
         protos[nproto].fn = fn;
         nproto++;
     }
-}
-
-void eth_arp_probe(void) {
-    /* A minimal ARP request (who-has 10.0.2.2, tell 10.0.2.15) so SLIRP
-     * replies and we can confirm the RX path. The real ARP module supplants
-     * this next. */
-    uint8_t arp[28];
-    arp[0] = 0x00;
-    arp[1] = 0x01; /* htype = Ethernet */
-    arp[2] = 0x08;
-    arp[3] = 0x00; /* ptype = IPv4 */
-    arp[4] = ETH_ALEN;
-    arp[5] = 4; /* hlen / plen */
-    arp[6] = 0x00;
-    arp[7] = 0x01; /* oper = request */
-    for (int i = 0; i < ETH_ALEN; i++)
-        arp[8 + i] = our_mac[i]; /* sender hardware addr */
-    arp[14] = 10;
-    arp[15] = 0;
-    arp[16] = 2;
-    arp[17] = 15; /* sender protocol addr 10.0.2.15 */
-    for (int i = 0; i < ETH_ALEN; i++)
-        arp[18 + i] = 0; /* target hardware addr (unknown) */
-    arp[24] = 10;
-    arp[25] = 0;
-    arp[26] = 2;
-    arp[27] = 2; /* target protocol addr 10.0.2.2 */
-    eth_send(eth_broadcast, ETH_TYPE_ARP, arp, sizeof(arp));
 }
