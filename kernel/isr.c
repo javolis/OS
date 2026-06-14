@@ -8,6 +8,7 @@
 #include "kprintf.h"
 #include "sched.h"
 #include "syscall.h"
+#include "term.h"
 
 static const char *const exception_names[32] = {
     "Divide Error",
@@ -65,6 +66,7 @@ void isr_handler(struct registers *regs) {
     /* A fault raised in ring 3 is the task's problem, not the kernel's:
      * report it, kill the task, and keep the system running. */
     if ((regs->cs & 3) == 3) {
+        term_set_color(TERM_RED);
         kprintf("[pid %lu] killed: %s at eip=%08lx", sched_current_pid(),
                 exception_names[regs->int_no & 31], regs->eip);
         if (regs->int_no == 14)
@@ -74,9 +76,11 @@ void isr_handler(struct registers *regs) {
                                          : "to unmapped address",
                     cr2);
         kprintf("\n");
+        term_reset_color();
         task_exit((uint32_t)-1);
     }
 
+    term_set_color(TERM_RED);
     kprintf("\nKERNEL PANIC: exception %lu (%s), error code %08lx\n",
             regs->int_no, exception_names[regs->int_no & 31], regs->err_code);
     if (regs->int_no == 14)

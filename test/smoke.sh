@@ -148,6 +148,21 @@ else
     fail=1
 fi
 
+# Console color: the kernel renders the same glyph in two colors at a
+# scratch cell and logs both region checksums. They must both be non-zero
+# (the glyph drew) and differ from each other (color actually changed the
+# pixels) - proof the framebuffer console honors per-glyph color.
+fbcolor=$(grep -oE "fbcolor red=[0-9a-f]{8} cyan=[0-9a-f]{8}" "$SERIAL_LOG" | head -n1)
+red=${fbcolor#fbcolor red=}; red=${red% cyan=*}
+cyan=${fbcolor##*cyan=}
+if [ -n "$fbcolor" ] && [ "$red" != "00000000" ] && [ "$cyan" != "00000000" ] \
+        && [ "$red" != "$cyan" ]; then
+    echo "PASS: framebuffer console honors color (red=${red} cyan=${cyan})"
+else
+    echo "FAIL: console color not honored (${fbcolor:-no fbcolor line})" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then

@@ -57,4 +57,17 @@ else
     fail=1
 fi
 
+# Console color works on the GOP framebuffer too (same proof as the BIOS
+# lane: two colors of the same glyph must checksum differently).
+fbcolor=$(grep -oE "fbcolor red=[0-9a-f]{8} cyan=[0-9a-f]{8}" "$SERIAL_LOG" | head -n1)
+red=${fbcolor#fbcolor red=}; red=${red% cyan=*}
+cyan=${fbcolor##*cyan=}
+if [ -n "$fbcolor" ] && [ "$red" != "00000000" ] && [ "$cyan" != "00000000" ] \
+        && [ "$red" != "$cyan" ]; then
+    echo "PASS: UEFI console honors color (red=${red} cyan=${cyan})"
+else
+    echo "FAIL: console color not honored under UEFI (${fbcolor:-none})" >&2
+    fail=1
+fi
+
 exit $fail
