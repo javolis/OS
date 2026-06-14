@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dns.h"
 #include "fb.h"
 #include "file.h"
 #include "icmp.h"
@@ -713,6 +714,23 @@ void syscall_handle(struct registers *regs) {
     case SYS_PING: {
         int ticks = icmp_ping((ipaddr_t)regs->ebx);
         regs->eax = (ticks < 0) ? (uint32_t)-1 : (uint32_t)(ticks * 10);
+        return;
+    }
+
+    case SYS_RESOLVE: {
+        char name[128];
+        if (copy_user_name(regs->ebx, name, sizeof(name)) != 0 ||
+            !user_range_writable(regs->ecx, sizeof(uint32_t))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        ipaddr_t ip = 0;
+        if (dns_resolve(name, &ip)) {
+            *(uint32_t *)regs->ecx = ip;
+            regs->eax = 0;
+        } else {
+            regs->eax = (uint32_t)-1;
+        }
         return;
     }
 

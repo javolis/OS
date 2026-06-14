@@ -55,4 +55,6 @@ void net_register(uint16_t ethertype, eth_proto_fn fn);
 ipaddr_t net_ip(void);
 ipaddr_t net_gateway(void);
 ipaddr_t net_netmask(void);
+ipaddr_t net_dns(void);
 void net_set_config(ipaddr_t ip, ipaddr_t gw, ipaddr_t mask);
+void net_set_dns(ipaddr_t dns);

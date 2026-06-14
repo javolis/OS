@@ -19,6 +19,7 @@ static uint8_t our_mac[ETH_ALEN];
 static ipaddr_t cfg_ip = IPV4(10, 0, 2, 15);
 static ipaddr_t cfg_gw = IPV4(10, 0, 2, 2);
 static ipaddr_t cfg_mask = IPV4(255, 255, 255, 0);
+static ipaddr_t cfg_dns = IPV4(10, 0, 2, 3);
 
 ipaddr_t net_ip(void) {
     return cfg_ip;
@@ -29,10 +30,16 @@ ipaddr_t net_gateway(void) {
 ipaddr_t net_netmask(void) {
     return cfg_mask;
 }
+ipaddr_t net_dns(void) {
+    return cfg_dns;
+}
 void net_set_config(ipaddr_t ip, ipaddr_t gw, ipaddr_t mask) {
     cfg_ip = ip;
     cfg_gw = gw;
     cfg_mask = mask;
+}
+void net_set_dns(ipaddr_t dns) {
+    cfg_dns = dns;
 }
 
 #define MAX_PROTO 4
