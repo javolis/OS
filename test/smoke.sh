@@ -191,6 +191,17 @@ else
     fail=1
 fi
 
+# Ethernet round-trip: the kernel broadcasts an ARP request for the SLIRP
+# gateway at boot; SLIRP replies, the NIC RX IRQ fires, and the Ethernet
+# layer demuxes it. Seeing a received ARP frame (ethertype 0806) proves
+# TX, RX-over-IRQ, and frame parsing all work end to end.
+if grep -qi "eth: rx ethertype 0806" "$SERIAL_LOG"; then
+    echo "PASS: Ethernet TX/RX round-trip (ARP reply received)"
+else
+    echo "FAIL: no Ethernet frame received from the wire" >&2
+    fail=1
+fi
+
 # Printed only after kmalloc/kfree round-trips (including a heap growth
 # that maps fresh frames into the heap's virtual region).
 if grep -q "self-test passed" "$SERIAL_LOG"; then
