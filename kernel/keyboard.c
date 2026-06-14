@@ -19,6 +19,7 @@
 
 /* Scancode set 1 make codes for a US QWERTY layout. 0 = no printable char. */
 static const char keymap[128] = {
+    [0x01] = 27, /* Esc -> 0x1B, so UIs can use it to go back */
     [0x02] = '1', [0x03] = '2', [0x04] = '3', [0x05] = '4', [0x06] = '5',
     [0x07] = '6', [0x08] = '7', [0x09] = '8', [0x0A] = '9', [0x0B] = '0',
     [0x0C] = '-', [0x0D] = '=', [0x0E] = '\b', [0x0F] = '\t',
@@ -35,6 +36,7 @@ static const char keymap[128] = {
 };
 
 static const char keymap_shift[128] = {
+    [0x01] = 27, /* Esc */
     [0x02] = '!', [0x03] = '@', [0x04] = '#', [0x05] = '$', [0x06] = '%',
     [0x07] = '^', [0x08] = '&', [0x09] = '*', [0x0A] = '(', [0x0B] = ')',
     [0x0C] = '_', [0x0D] = '+', [0x0E] = '\b', [0x0F] = '\t',

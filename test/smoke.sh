@@ -97,7 +97,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
-               ret p ret ret slash d a t e ret q \
+               ret s d esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
@@ -609,18 +609,20 @@ else
     fail=1
 fi
 
-# Avolis shell: lock -> unlock -> desktop (move taskbar with 'p') ->
-# applications overview (Enter on Apps, Enter launches gfxdemo) -> command
-# palette (open with '/', type "date", Enter launches date.elf). CI drives
-# the whole path and checks every transition + both real launches.
+# Avolis shell, full v1 flow: unlock -> settings (change wallpaper, Esc back,
+# which also exercises the new Esc keymap) -> move taskbar -> applications
+# overview (launch gfxdemo) -> command palette (type "date", launch date.elf)
+# -> quit. CI drives it all and checks every transition + both real launches.
 if grep -q "avolis: unlocked" "$SERIAL_LOG" \
+        && grep -q "avolis: settings" "$SERIAL_LOG" \
+        && grep -q "avolis: wallpaper ember" "$SERIAL_LOG" \
         && grep -q "avolis: taskbar left" "$SERIAL_LOG" \
         && grep -q "avolis: apps" "$SERIAL_LOG" \
         && grep -q "avolis: run gfxdemo.elf" "$SERIAL_LOG" \
         && grep -q "avolis: palette" "$SERIAL_LOG" \
         && grep -q "avolis: run date.elf" "$SERIAL_LOG" \
         && grep -q "avolis: bye" "$SERIAL_LOG"; then
-    echo "PASS: Avolis full flow (desktop, taskbar, apps grid, palette, launch)"
+    echo "PASS: Avolis v1 full flow (lock, settings, taskbar, apps, palette)"
 else
     echo "FAIL: Avolis shell interactions broke" >&2
     fail=1

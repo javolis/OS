@@ -9,8 +9,22 @@
  * "avolis.elf test" bounds the loop and quits on 'q' for CI. */
 #include "avui.h"
 
-enum { LOCK, DESKTOP, PALETTE, APPS };
+enum { LOCK, DESKTOP, PALETTE, APPS, SETTINGS };
 enum { TB_BOTTOM, TB_LEFT, TB_RIGHT, TB_TOP };
+
+/* Wallpapers are generated gradients (no image files yet). Literal hex so
+ * they can initialize a static table (ugfx_rgb is a function, not const). */
+struct wp {
+    const char *name;
+    unsigned top, bot;
+};
+static const struct wp walls[] = {
+    {"midnight", 0x0a0c16, 0x0d0d0d},
+    {"ember", 0x1a120a, 0x0d0d0d},
+    {"carbon", 0x141414, 0x000000},
+    {"dusk", 0x1a1226, 0x0d0d0d},
+};
+#define NWALLS ((int)(sizeof(walls) / sizeof(walls[0])))
 
 #define TB_THICK 60
 #define APPS_COLS 4
@@ -47,6 +61,31 @@ static const char *wdays[7] = {"Sunday",    "Monday", "Tuesday", "Wednesday",
 
 static char query[32];
 static int qlen;
+static int wp; /* current wallpaper index */
+
+/* Persist wallpaper + taskbar position to a ramfs config (session-only;
+ * ramfs resets at reboot). */
+static void save_cfg(int pos) {
+    int fd = sys_create("avolis.cfg");
+    if (fd >= 0) {
+        char b[2] = {(char)wp, (char)pos};
+        sys_writefd(fd, b, 2);
+        sys_close(fd);
+    }
+}
+static void load_cfg(int *pos) {
+    int fd = sys_open("avolis.cfg");
+    if (fd >= 0) {
+        char b[2];
+        if (sys_read(fd, b, 2) == 2) {
+            if (b[0] >= 0 && b[0] < NWALLS)
+                wp = b[0];
+            if (b[1] >= 0 && b[1] < 4)
+                *pos = b[1];
+        }
+        sys_close(fd);
+    }
+}
 
 static int dow(int y, int m, int d) {
     static const int t[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
@@ -117,7 +156,7 @@ static void draw_lock(ugfx_t *g) {
     int W = (int)g->width, H = (int)g->height;
     struct systime t;
     int have = (sys_time(&t) == 0);
-    ugfx_vgradient(g, 0, 0, W, H, ugfx_rgb(26, 18, 10), AV_BG);
+    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
     av_head(g, 40, 56, "AVOLIS", AV_ORANGE);
     char clk[6];
     clock_str(clk);
@@ -140,7 +179,7 @@ static void draw_lock(ugfx_t *g) {
 
 static void draw_desktop(ugfx_t *g, int pos, int focus) {
     int W = (int)g->width, H = (int)g->height;
-    ugfx_vgradient(g, 0, 0, W, H, ugfx_rgb(10, 12, 22), AV_BG);
+    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
     ua_text_center(g, UAFONT_HEAD, 0, W, H / 2 - 10, "Avolis", AV_DIM);
 
     int horiz = (pos == TB_BOTTOM || pos == TB_TOP);
@@ -208,7 +247,7 @@ static void draw_palette(ugfx_t *g, int pos, int sel) {
 
 static void draw_apps(ugfx_t *g, int sel) {
     int W = (int)g->width, H = (int)g->height;
-    ugfx_vgradient(g, 0, 0, W, H, ugfx_rgb(10, 12, 22), AV_BG);
+    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
     av_head(g, 40, 56, "Applications", AV_ORANGE);
 
     int tw = 150, th = 92, gap = 24;
@@ -223,6 +262,26 @@ static void draw_apps(ugfx_t *g, int sel) {
     }
     ua_text_center(g, UAFONT_BODY, 0, W, H - 48,
                    "enter open    -    esc back", AV_DIM);
+}
+
+static void draw_settings(ugfx_t *g, int srow, int pos) {
+    int W = (int)g->width, H = (int)g->height;
+    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
+    av_head(g, 40, 56, "Settings", AV_ORANGE);
+
+    const char *labels[2] = {"Wallpaper", "Taskbar position"};
+    const char *values[2] = {walls[wp].name, tb_names[pos]};
+    int rx = 80, ry0 = 170, rh = 66;
+    for (int r = 0; r < 2; r++) {
+        int y = ry0 + r * rh;
+        if (r == srow)
+            ugfx_round_rect(g, rx - 18, y - 30, W - 2 * (rx - 18), 46, 8,
+                            AV_PANEL2);
+        av_text(g, rx, y, labels[r], AV_GRAY);
+        av_text(g, rx + 340, y, values[r], r == srow ? AV_ORANGE : AV_WHITE);
+    }
+    ua_text_center(g, UAFONT_BODY, 0, W, H - 48,
+                   "a / d change    -    esc back", AV_DIM);
 }
 
 static void launch(const char *elf) {
@@ -241,7 +300,9 @@ void _start(int argc, char **argv) {
         sys_exit(0);
     }
     int test = (argc >= 2 && argv[1][0] == 't');
-    int state = LOCK, pos = TB_BOTTOM, focus = 0, sel = 0, quit = 0, cycles = 0;
+    int state = LOCK, pos = TB_BOTTOM, focus = 0, sel = 0, srow = 0, quit = 0,
+        cycles = 0;
+    load_cfg(&pos);
     uprintf("avolis: lock screen\n");
     while (!quit) {
         if (state == LOCK)
@@ -250,6 +311,8 @@ void _start(int argc, char **argv) {
             draw_desktop(&g, pos, focus);
         else if (state == APPS)
             draw_apps(&g, sel);
+        else if (state == SETTINGS)
+            draw_settings(&g, srow, pos);
         else
             draw_palette(&g, pos, sel);
         ugfx_flush(&g);
@@ -284,6 +347,10 @@ void _start(int argc, char **argv) {
                 sel = 0;
                 state = PALETTE;
                 uprintf("avolis: palette\n");
+            } else if (k == 's' || k == 'S') {
+                srow = 0;
+                state = SETTINGS;
+                uprintf("avolis: settings\n");
             } else if (k == K_UP || k == 'a')
                 focus = (focus + NBAR - 1) % NBAR;
             else if (k == K_DOWN || k == 'd')
@@ -291,11 +358,35 @@ void _start(int argc, char **argv) {
             else if (k == '\n' || k == '\r') {
                 if (bar[focus].elf[0]) {
                     launch(bar[focus].elf);
-                } else { /* "Apps"/"Settings" open the application overview */
+                } else if (ustreq(bar[focus].label, "Settings")) {
+                    srow = 0;
+                    state = SETTINGS;
+                    uprintf("avolis: settings\n");
+                } else { /* "Apps" opens the application overview */
                     sel = 0;
                     state = APPS;
                     uprintf("avolis: apps\n");
                 }
+            }
+        } else if (state == SETTINGS) {
+            if (k == 27) {
+                state = DESKTOP;
+            } else if (k == K_UP) {
+                if (srow > 0)
+                    srow--;
+            } else if (k == K_DOWN) {
+                if (srow < 1)
+                    srow++;
+            } else if (k == 'a' || k == 'd' || k == '\n' || k == '\r') {
+                int fwd = (k != 'a');
+                if (srow == 0) {
+                    wp = (wp + (fwd ? 1 : NWALLS - 1)) % NWALLS;
+                    uprintf("avolis: wallpaper %s\n", walls[wp].name);
+                } else {
+                    pos = (pos + (fwd ? 1 : 3)) % 4;
+                    uprintf("avolis: taskbar %s\n", tb_names[pos]);
+                }
+                save_cfg(pos);
             }
         } else if (state == APPS) {
             if (k == 27) {
