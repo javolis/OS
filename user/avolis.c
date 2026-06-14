@@ -1,16 +1,15 @@
 /* avolis.c - the Avolis desktop shell.
  *
- * Lock screen (wallpaper, anti-aliased RTC clock, press enter) -> desktop:
- * mostly wallpaper with a Windows-11-style taskbar that can sit on any edge
- * (the user cycles it with 'p'), centered app buttons, an orange accent line
- * and a clock. Keyboard-first: up/down (or a/d) move focus, enter activates.
- * The event loop polls SYS_TRYGETKEY so the clock ticks while it waits.
+ * Lock screen -> desktop (wallpaper + a Windows-11-style taskbar that sits on
+ * any edge) -> command palette (the north star: type to find a program,
+ * enter to launch it). Launching hands the screen+keyboard to the program
+ * (sys_spawn_fg) and waits, then redraws the desktop. Keyboard-first; the
+ * event loop polls SYS_TRYGETKEY so the clock ticks while idle.
  *
- * "avolis.elf test" bounds the loop and quits on 'q' for CI; plain
- * "avolis.elf" runs as a normal shell. */
+ * "avolis.elf test" bounds the loop and quits on 'q' for CI. */
 #include "avui.h"
 
-enum { LOCK, DESKTOP };
+enum { LOCK, DESKTOP, PALETTE };
 enum { TB_BOTTOM, TB_LEFT, TB_RIGHT, TB_TOP };
 
 #define TB_THICK 60
@@ -21,20 +20,32 @@ static const char *tb_names[4] = {"bottom", "left", "right", "top"};
 
 struct app {
     const char *label;
-    const char *elf; /* "" = a shell area (launcher/settings), wired later */
+    const char *elf; /* "" = opens the palette (launcher) */
 };
-static const struct app apps[] = {
-    {"Apps", ""},          {"Graphics", "gfxdemo.elf"},
-    {"System", "sysinfo.elf"}, {"Network", "netcap.elf"},
+/* Taskbar entries (a curated few) and the fuller palette list. */
+static const struct app bar[] = {
+    {"Apps", ""},
+    {"Graphics", "gfxdemo.elf"},
+    {"System", "sysinfo.elf"},
     {"Settings", ""},
 };
-#define NAPPS ((int)(sizeof(apps) / sizeof(apps[0])))
+#define NBAR ((int)(sizeof(bar) / sizeof(bar[0])))
+static const struct app pal[] = {
+    {"graphics demo", "gfxdemo.elf"}, {"input demo", "inputdemo.elf"},
+    {"system info", "sysinfo.elf"},   {"date", "date.elf"},
+    {"files", "ls.elf"},              {"network", "netcap.elf"},
+    {"shell", "ush.elf"},
+};
+#define NPAL ((int)(sizeof(pal) / sizeof(pal[0])))
 
 static const char *months[12] = {
     "January", "February", "March",     "April",   "May",      "June",
     "July",    "August",   "September", "October", "November", "December"};
 static const char *wdays[7] = {"Sunday",    "Monday", "Tuesday", "Wednesday",
                                "Thursday", "Friday", "Saturday"};
+
+static char query[32];
+static int qlen;
 
 static int dow(int y, int m, int d) {
     static const int t[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
@@ -78,6 +89,28 @@ static void clock_str(char *clk) {
         put_s(clk, "--:--")[0] = '\0';
     }
 }
+static int lc(int c) { return (c >= 'A' && c <= 'Z') ? c + 32 : c; }
+static int contains(const char *s, const char *q) {
+    if (!*q)
+        return 1;
+    for (; *s; s++) {
+        const char *a = s, *b = q;
+        while (*a && *b && lc(*a) == lc(*b)) {
+            a++;
+            b++;
+        }
+        if (!*b)
+            return 1;
+    }
+    return 0;
+}
+static int pal_filter(int *out) {
+    int n = 0;
+    for (int i = 0; i < NPAL; i++)
+        if (contains(pal[i].label, query))
+            out[n++] = i;
+    return n;
+}
 
 static void draw_lock(ugfx_t *g) {
     int W = (int)g->width, H = (int)g->height;
@@ -116,8 +149,7 @@ static void draw_desktop(ugfx_t *g, int pos, int focus) {
     else if (pos == TB_LEFT) { bx = 0; by = 0; bw = TB_THICK; bh = H; }
     else { bx = W - TB_THICK; by = 0; bw = TB_THICK; bh = H; }
 
-    ugfx_blend_rect(g, bx, by, bw, bh, AV_PANEL, 240); /* taskbar surface */
-    /* thin orange accent on the bar's inner edge */
+    ugfx_blend_rect(g, bx, by, bw, bh, AV_PANEL, 240);
     if (pos == TB_BOTTOM) ugfx_fillrect(g, bx, by, bw, 2, AV_ORANGE);
     else if (pos == TB_TOP) ugfx_fillrect(g, bx, by + bh - 2, bw, 2, AV_ORANGE);
     else if (pos == TB_LEFT) ugfx_fillrect(g, bx + bw - 2, by, 2, bh, AV_ORANGE);
@@ -126,21 +158,60 @@ static void draw_desktop(ugfx_t *g, int pos, int focus) {
     int iw = horiz ? 104 : (TB_THICK - 12);
     int ih = horiz ? (TB_THICK - 14) : 38;
     int gap = 10;
-    int total = NAPPS * (horiz ? iw : ih) + (NAPPS - 1) * gap;
+    int total = NBAR * (horiz ? iw : ih) + (NBAR - 1) * gap;
     int run = (horiz ? bx + (bw - total) / 2 : by + (bh - total) / 2);
-    for (int i = 0; i < NAPPS; i++) {
+    for (int i = 0; i < NBAR; i++) {
         int ix, iy;
         if (horiz) { ix = run + i * (iw + gap); iy = by + 7; }
         else { ix = bx + 6; iy = run + i * (ih + gap); }
-        av_button(g, ix, iy, iw, ih, apps[i].label, i == focus);
+        av_button(g, ix, iy, iw, ih, bar[i].label, i == focus);
     }
-
     char clk[6];
     clock_str(clk);
     if (horiz)
         ua_text(g, UAFONT_BODY, bx + bw - 64, by + bh / 2 + 6, clk, AV_GRAY);
     else
         ua_text_center(g, UAFONT_BODY, bx, bw, by + bh - 18, clk, AV_GRAY);
+}
+
+static void draw_palette(ugfx_t *g, int pos, int sel) {
+    int W = (int)g->width, H = (int)g->height;
+    draw_desktop(g, pos, -1);
+    ugfx_blend_rect(g, 0, 0, W, H, ugfx_rgb(0, 0, 0), 150); /* dim behind */
+
+    int pw = 560, ph = 360, px = (W - pw) / 2, py = (H - ph) / 2;
+    av_panel(g, px, py, pw, ph, 1);
+
+    char line[40];
+    char *p = put_s(line, query);
+    *p++ = '_'; /* caret */
+    *p = '\0';
+    ua_text(g, UAFONT_HEAD, px + 28, py + 56,
+            query[0] ? line : "search...", query[0] ? AV_WHITE : AV_DIM);
+    ugfx_fillrect(g, px + 24, py + 74, pw - 48, 2, AV_BORDER);
+
+    int match[NPAL];
+    int n = pal_filter(match);
+    if (n == 0) {
+        av_text(g, px + 28, py + 116, "no matches", AV_DIM);
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        int ry = py + 92 + i * 38;
+        if (i == sel)
+            ugfx_round_rect(g, px + 16, ry, pw - 32, 34, 6, AV_PANEL2);
+        av_text(g, px + 30, ry + 24, pal[match[i]].label,
+                i == sel ? AV_ORANGE : AV_WHITE);
+    }
+}
+
+static void launch(const char *elf) {
+    if (!elf[0])
+        return;
+    uprintf("avolis: run %s\n", elf);
+    int pid = sys_spawn_fg(elf);
+    if (pid >= 0)
+        sys_wait(pid); /* the app owns the screen until it exits */
 }
 
 void _start(int argc, char **argv) {
@@ -150,13 +221,15 @@ void _start(int argc, char **argv) {
         sys_exit(0);
     }
     int test = (argc >= 2 && argv[1][0] == 't');
-    int state = LOCK, pos = TB_BOTTOM, focus = 0, quit = 0, cycles = 0;
+    int state = LOCK, pos = TB_BOTTOM, focus = 0, sel = 0, quit = 0, cycles = 0;
     uprintf("avolis: lock screen\n");
     while (!quit) {
         if (state == LOCK)
             draw_lock(&g);
-        else
+        else if (state == DESKTOP)
             draw_desktop(&g, pos, focus);
+        else
+            draw_palette(&g, pos, sel);
         ugfx_flush(&g);
 
         int k = -1;
@@ -165,31 +238,77 @@ void _start(int argc, char **argv) {
             if (k < 0)
                 sys_sleep(50);
         }
-        if (k >= 0) {
-            if (k == 'q' || k == 'Q') {
-                quit = 1;
-            } else if (state == LOCK) {
-                if (k == '\n' || k == '\r') {
-                    state = DESKTOP;
-                    uprintf("avolis: unlocked\n");
-                }
-            } else { /* DESKTOP */
-                if (k == 27) {
-                    state = LOCK;
-                    uprintf("avolis: locked\n");
-                } else if (k == 'p' || k == 'P') {
-                    pos = (pos + 1) % 4;
-                    uprintf("avolis: taskbar %s\n", tb_names[pos]);
-                } else if (k == K_UP || k == 'a') {
-                    focus = (focus + NAPPS - 1) % NAPPS;
-                } else if (k == K_DOWN || k == 'd') {
-                    focus = (focus + 1) % NAPPS;
-                } else if (k == '\n' || k == '\r') {
-                    uprintf("avolis: launch %s\n", apps[focus].label);
+        if (k < 0) {
+            if (test && ++cycles > 120)
+                break;
+            continue;
+        }
+
+        if (k == 'q' && state != PALETTE) {
+            quit = 1;
+        } else if (state == LOCK) {
+            if (k == '\n' || k == '\r') {
+                state = DESKTOP;
+                uprintf("avolis: unlocked\n");
+            }
+        } else if (state == DESKTOP) {
+            if (k == 27)
+                state = LOCK, uprintf("avolis: locked\n");
+            else if (k == 'p' || k == 'P')
+                pos = (pos + 1) % 4, uprintf("avolis: taskbar %s\n", tb_names[pos]);
+            else if (k == '/') {
+                qlen = 0;
+                query[0] = '\0';
+                sel = 0;
+                state = PALETTE;
+                uprintf("avolis: palette\n");
+            } else if (k == K_UP || k == 'a')
+                focus = (focus + NBAR - 1) % NBAR;
+            else if (k == K_DOWN || k == 'd')
+                focus = (focus + 1) % NBAR;
+            else if (k == '\n' || k == '\r') {
+                if (bar[focus].elf[0]) {
+                    launch(bar[focus].elf);
+                } else { /* "Apps"/"Settings" open the palette */
+                    qlen = 0;
+                    query[0] = '\0';
+                    sel = 0;
+                    state = PALETTE;
+                    uprintf("avolis: palette\n");
                 }
             }
+        } else { /* PALETTE */
+            if (k == 27) {
+                state = DESKTOP;
+            } else if (k == K_UP) {
+                if (sel > 0)
+                    sel--;
+            } else if (k == K_DOWN) {
+                sel++;
+            } else if (k == '\b' || k == 0x7F) {
+                if (qlen > 0)
+                    query[--qlen] = '\0';
+                sel = 0;
+            } else if (k == '\n' || k == '\r') {
+                int match[NPAL];
+                int n = pal_filter(match);
+                if (n > 0) {
+                    if (sel >= n)
+                        sel = n - 1;
+                    launch(pal[match[sel]].elf);
+                }
+                state = DESKTOP;
+            } else if (k >= 0x20 && k < 0x7F && qlen < (int)sizeof(query) - 1) {
+                query[qlen++] = (char)k;
+                query[qlen] = '\0';
+                sel = 0;
+            }
+            int match[NPAL];
+            int n = pal_filter(match);
+            if (n > 0 && sel >= n)
+                sel = n - 1;
         }
-        if (test && ++cycles > 80) /* CI failsafe: never hang the smoke */
+        if (test && ++cycles > 120)
             break;
     }
     uprintf("avolis: bye\n");
