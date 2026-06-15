@@ -1020,4 +1020,29 @@ else
     fail=1
 fi
 
+# Power: a fresh short boot. The 'shutdown' command must power the machine off
+# via ACPI (QEMU exits on its own), so the follow-up echo marker must never run.
+echo "----- power-off test -----"
+POWER_LOG=$(mktemp)
+{
+    sleep 8
+    for k in s h u t d o w n ret; do echo "sendkey $k"; sleep 0.2; done
+    sleep 2
+    for k in e c h o spc z z a l i v e z z ret; do echo "sendkey $k"; sleep 0.2; done
+    sleep 2
+    echo "quit"
+} | timeout 90 qemu-system-i386 \
+        -cdrom "$ISO" \
+        -display none \
+        -serial "file:$POWER_LOG" \
+        -monitor stdio \
+        -no-reboot >/dev/null 2>&1
+if grep -q "power: off" "$POWER_LOG" && ! grep -q "zzalivezz" "$POWER_LOG"; then
+    echo "PASS: shutdown powered the machine off (ACPI)"
+else
+    echo "FAIL: shutdown did not power off cleanly" >&2
+    fail=1
+fi
+rm -f "$POWER_LOG"
+
 exit $fail

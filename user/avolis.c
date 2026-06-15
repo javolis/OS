@@ -68,11 +68,13 @@ enum {
     CAT_NETWORK,
     CAT_PERSONAL,
     CAT_DATETIME,
+    CAT_POWER,
     NCAT
 };
-static const char *cat_names[NCAT] = {"System",      "Display",  "Sound",
-                                      "Network",     "Personalize",
-                                      "Date & Time"};
+static const char *cat_names[NCAT] = {"System",      "Display",
+                                      "Sound",       "Network",
+                                      "Personalize", "Date & Time",
+                                      "Power"};
 
 /* Shell state (global so mouse and keyboard share the same actions). */
 static int state = LOCK, pos = TB_BOTTOM, focus, sel, srow, wp;
@@ -92,6 +94,8 @@ static int cat_rows(int c) {
         return 1;
     if (c == CAT_SOUND)
         return 1;
+    if (c == CAT_POWER)
+        return 2;
     return 0;
 }
 
@@ -285,6 +289,13 @@ static void settings_change(int c, int row, int dir) {
         if (volume > 100)
             volume = 100;
         sys_audio_volume(volume);
+    } else if (c == CAT_POWER) {
+        if (dir > 0) { /* only act on enter / right, never on 'a' */
+            if (row == 0)
+                sys_poweroff();
+            else
+                sys_reboot();
+        }
     }
 }
 
@@ -382,6 +393,11 @@ static int settings_content(ugfx_t *g, int c, char labels[][24],
         }
         put_s(labels[n], "Time format");
         put_s(values[n++], timefmt ? "12-hour" : "24-hour");
+    } else if (c == CAT_POWER) {
+        put_s(labels[n], "Shut down");
+        put_s(values[n++], "power off");
+        put_s(labels[n], "Restart");
+        put_s(values[n++], "reboot");
     }
     return n;
 }

@@ -13,6 +13,7 @@
 #include "process.h"
 #include "ramfs.h"
 #include "rtc.h"
+#include "power.h"
 #include "sched.h"
 #include "serial.h"
 #include "shell.h"
@@ -173,7 +174,11 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls run ps kill date\n");
+                    "history ls run ps kill date shutdown reboot\n");
+        else if (streq(cmd, "shutdown"))
+            power_off();
+        else if (streq(cmd, "reboot"))
+            power_reboot();
         else if (streq(cmd, "ps"))
             sched_ps();
         else if (streq(cmd, "ls")) {
