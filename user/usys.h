@@ -211,6 +211,15 @@ static inline int sys_mouse(struct mousestate *out) {
     return ret;
 }
 
+/* Play a square-wave tone of `freq` Hz on the PC speaker for `ms` ms, then
+ * silence. freq 0 silences immediately. Blocks the caller for the duration
+ * (the scheduler runs others meanwhile). Returns 0. */
+static inline int sys_beep(int freq, int ms) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(36), "b"(freq), "c"(ms));
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

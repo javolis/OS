@@ -26,6 +26,7 @@
 #include "process.h"
 #include "sched.h"
 #include "shell.h"
+#include "speaker.h"
 #include "tcp.h"
 #include "term.h"
 #include "timer.h"
@@ -154,6 +155,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     timer_init(100);
     keyboard_init();
     mouse_init();
+    speaker_init(); /* silence the PC speaker (PIT channel 2) */
     __asm__ volatile("sti");
 
     /* Prove hardware IRQs fire: wait for the PIT to tick 10 times (100 ms).

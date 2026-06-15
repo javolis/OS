@@ -126,6 +126,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a p p t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret \
+               r u n spc b e e p t e s t dot e l f ret \
                r u n spc m o u s e t e s t dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
@@ -634,6 +635,15 @@ if grep -q "mouse: moved to" "$SERIAL_LOG" \
     echo "PASS: PS/2 mouse reports movement and clicks"
 else
     echo "FAIL: mouse did not report movement/click" >&2
+    fail=1
+fi
+
+# PC speaker: beeptest plays an arpeggio via SYS_BEEP. CI can't hear audio,
+# but the run must complete with every tone syscall returning 0.
+if grep -q "beep: ok" "$SERIAL_LOG"; then
+    echo "PASS: PC speaker SYS_BEEP tones returned ok"
+else
+    echo "FAIL: SYS_BEEP did not complete" >&2
     fail=1
 fi
 

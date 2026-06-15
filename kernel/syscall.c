@@ -24,6 +24,7 @@
 #include "rtl8139.h"
 #include "sched.h"
 #include "serial.h"
+#include "speaker.h"
 #include "syscall.h"
 #include "tcp.h"
 #include "term.h"
@@ -863,6 +864,23 @@ void syscall_handle(struct registers *regs) {
         ms->x = x;
         ms->y = y;
         ms->buttons = b;
+        regs->eax = 0;
+        return;
+    }
+
+    case SYS_BEEP: {
+        uint32_t freq = regs->ebx, ms = regs->ecx;
+        if (freq == 0) {
+            speaker_off();
+            regs->eax = 0;
+            return;
+        }
+        if (ms > 2000)
+            ms = 2000; /* cap so a task can't hold the speaker open forever */
+        speaker_tone(freq);
+        if (ms)
+            sched_sleep_current((ms + 9) / 10); /* others run meanwhile */
+        speaker_off();
         regs->eax = 0;
         return;
     }
