@@ -9,6 +9,7 @@ void _start(void) {
         sys_exit(0);
     }
     uprintf("mouse: start %d,%d\n", m0.x, m0.y);
+    uprintf("mouse: speed %d\n", sys_mouse_speed(100));
 
     int moved = 0, clicked = 0;
     for (int i = 0; i < 300; i++) { /* ~15s at 50ms; CI injects repeatedly */

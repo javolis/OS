@@ -68,13 +68,17 @@ enum {
     CAT_NETWORK,
     CAT_PERSONAL,
     CAT_DATETIME,
+    CAT_MOUSE,
     CAT_POWER,
     NCAT
 };
 static const char *cat_names[NCAT] = {"System",      "Display",
                                       "Sound",       "Network",
                                       "Personalize", "Date & Time",
-                                      "Power"};
+                                      "Mouse",       "Power"};
+
+static const int mouse_speeds[] = {50, 75, 100, 150, 200};
+#define NMSPEED ((int)(sizeof(mouse_speeds) / sizeof(mouse_speeds[0])))
 
 /* Shell state (global so mouse and keyboard share the same actions). */
 static int state = LOCK, pos = TB_BOTTOM, focus, sel, srow, wp;
@@ -82,6 +86,7 @@ static int scat;       /* selected settings category */
 static int sdetail;    /* 0 = sidebar focused, 1 = detail pane focused */
 static int timefmt;    /* 0 = 24-hour clock, 1 = 12-hour */
 static int volume = 80; /* AC'97 master volume percent */
+static int mspeed = 2; /* index into mouse_speeds[] (100%) */
 static char query[32];
 static int qlen;
 static int par_ox, par_oy; /* constellation parallax offset */
@@ -93,6 +98,8 @@ static int cat_rows(int c) {
     if (c == CAT_DATETIME)
         return 1;
     if (c == CAT_SOUND)
+        return 1;
+    if (c == CAT_MOUSE)
         return 1;
     if (c == CAT_POWER)
         return 2;
@@ -289,6 +296,13 @@ static void settings_change(int c, int row, int dir) {
         if (volume > 100)
             volume = 100;
         sys_audio_volume(volume);
+    } else if (c == CAT_MOUSE) {
+        mspeed += dir;
+        if (mspeed < 0)
+            mspeed = 0;
+        if (mspeed >= NMSPEED)
+            mspeed = NMSPEED - 1;
+        sys_mouse_speed(mouse_speeds[mspeed]);
     } else if (c == CAT_POWER) {
         if (dir > 0) { /* only act on enter / right, never on 'a' */
             if (row == 0)
@@ -393,6 +407,14 @@ static int settings_content(ugfx_t *g, int c, char labels[][24],
         }
         put_s(labels[n], "Time format");
         put_s(values[n++], timefmt ? "12-hour" : "24-hour");
+    } else if (c == CAT_MOUSE) {
+        put_s(labels[n], "Device");
+        put_s(values[n++], "PS/2 mouse");
+        put_s(labels[n], "Pointer speed");
+        char *p = put_i(values[n], mouse_speeds[mspeed]);
+        *p++ = '%';
+        *p = '\0';
+        n++;
     } else if (c == CAT_POWER) {
         put_s(labels[n], "Shut down");
         put_s(values[n++], "power off");

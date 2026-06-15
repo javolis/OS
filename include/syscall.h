@@ -97,6 +97,8 @@
                           * Returns the clamped level, or -1 if no codec. */
 #define SYS_POWEROFF 41 /* power the machine off (does not return). */
 #define SYS_REBOOT 42   /* restart the machine (does not return). */
+#define SYS_MOUSE_SPEED 43 /* ebx = pointer speed percent (25-400); scales the
+                            * mouse deltas. Returns the clamped value. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct procinfo {

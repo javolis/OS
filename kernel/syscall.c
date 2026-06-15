@@ -967,6 +967,10 @@ void syscall_handle(struct registers *regs) {
         regs->eax = (uint32_t)ac97_set_volume((int)regs->ebx);
         return;
 
+    case SYS_MOUSE_SPEED:
+        regs->eax = (uint32_t)mouse_set_speed((int)regs->ebx);
+        return;
+
     case SYS_POWEROFF:
         power_off();
         return; /* not reached */

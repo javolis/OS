@@ -27,6 +27,7 @@ static int present;
 static volatile int mx, my;
 static volatile uint32_t buttons;
 static int scr_w = 800, scr_h = 600;
+static int speed_pct = 100; /* pointer speed: dx/dy scaled by this percent */
 
 static uint8_t pkt[3];
 static int pkt_i;
@@ -71,8 +72,8 @@ static void mouse_irq(struct registers *regs) {
         return; /* X/Y overflow: drop the packet */
     int dx = (int)pkt[1] - ((flags & 0x10) ? 256 : 0);
     int dy = (int)pkt[2] - ((flags & 0x20) ? 256 : 0);
-    int nx = mx + dx;
-    int ny = my - dy; /* screen Y grows downward; mouse Y grows up */
+    int nx = mx + dx * speed_pct / 100;
+    int ny = my - dy * speed_pct / 100; /* screen Y grows down; mouse Y up */
     if (nx < 0)
         nx = 0;
     if (nx > scr_w - 1)
@@ -126,4 +127,13 @@ void mouse_state(int *x, int *y, uint32_t *b) {
     *x = mx;
     *y = my;
     *b = buttons;
+}
+
+int mouse_set_speed(int pct) {
+    if (pct < 25)
+        pct = 25;
+    if (pct > 400)
+        pct = 400;
+    speed_pct = pct;
+    return speed_pct;
 }
