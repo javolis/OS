@@ -102,6 +102,44 @@ static inline void ugfx_clear(ugfx_t *g, unsigned rgb) {
     ugfx_fillrect(g, 0, 0, (int)g->width, (int)g->height, rgb);
 }
 
+/* Alpha-blended line (Bresenham). */
+static inline void ugfx_line(ugfx_t *g, int x0, int y0, int x1, int y1,
+                             unsigned rgb, unsigned a) {
+    int dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
+    int dy = y1 > y0 ? y1 - y0 : y0 - y1, sy = y0 < y1 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+    for (;;) {
+        ugfx_blend_pixel(g, x0, y0, rgb, a);
+        if (x0 == x1 && y0 == y1)
+            break;
+        int e2 = err;
+        if (e2 > -dx) {
+            err -= dy;
+            x0 += sx;
+        }
+        if (e2 < dy) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+/* Soft filled dot: a bright core plus a couple of dimmer rings, faking a
+ * glow without a real blur. r is the glow radius. */
+static inline void ugfx_glow_dot(ugfx_t *g, int cx, int cy, int r,
+                                 unsigned rgb) {
+    int r2 = (r * 8) * (r * 8);
+    for (int dy = -r; dy <= r; dy++)
+        for (int dx = -r; dx <= r; dx++) {
+            int d2 = (dx * 8) * (dx * 8) + (dy * 8) * (dy * 8);
+            if (d2 > r2)
+                continue;
+            /* coverage falls off with distance: full at center, ~0 at rim */
+            unsigned a = (unsigned)(220 - 220 * d2 / (r2 ? r2 : 1));
+            ugfx_blend_pixel(g, cx + dx, cy + dy, rgb, a);
+        }
+}
+
 /* Outline rectangle of thickness t. */
 static inline void ugfx_rect(ugfx_t *g, int x, int y, int w, int h, int t,
                              unsigned rgb) {

@@ -8,21 +8,23 @@
  *
  * "avolis.elf test" bounds the loop and quits on 'q' for CI. */
 #include "avui.h"
+#include "avwall.h"
 
 enum { LOCK, DESKTOP, PALETTE, APPS, SETTINGS };
 enum { TB_BOTTOM, TB_LEFT, TB_RIGHT, TB_TOP };
 
-/* Wallpapers are generated gradients (no image files yet). Literal hex so
- * they can initialize a static table (ugfx_rgb is a function, not const). */
+/* Wallpapers are generated "AI network" constellations (see avwall.h): a
+ * seed varies the node pattern, warm is the center-glow tint. */
 struct wp {
     const char *name;
-    unsigned top, bot;
+    unsigned seed;
+    unsigned warm;
 };
 static const struct wp walls[] = {
-    {"midnight", 0x0a0c16, 0x0d0d0d},
-    {"ember", 0x1a120a, 0x0d0d0d},
-    {"carbon", 0x141414, 0x000000},
-    {"dusk", 0x1a1226, 0x0d0d0d},
+    {"nebula", 0x1a2b3c4d, 0x281404},
+    {"ember", 0x9f331107, 0x3a1c08},
+    {"carbon", 0x55aa1133, 0x140d06},
+    {"dusk", 0x33cc55aa, 0x1e1024},
 };
 #define NWALLS ((int)(sizeof(walls) / sizeof(walls[0])))
 
@@ -156,12 +158,13 @@ static void draw_lock(ugfx_t *g) {
     int W = (int)g->width, H = (int)g->height;
     struct systime t;
     int have = (sys_time(&t) == 0);
-    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
-    av_head(g, 40, 56, "AVOLIS", AV_ORANGE);
+    avwall_render(g, walls[wp].seed, walls[wp].warm);
+    ugfx_glow_dot(g, 30, 46, 5, AV_ORANGE);
+    av_text_glow(g, UAFONT_HEAD, 52, 56, "AVOLIS", AV_ORANGE);
     char clk[6];
     clock_str(clk);
     int cw = ua_text_width(UAFONT_DISPLAY, clk);
-    ua_text(g, UAFONT_DISPLAY, (W - cw) / 2, H / 2, clk, AV_WHITE);
+    av_text_glow(g, UAFONT_DISPLAY, (W - cw) / 2, H / 2, clk, AV_WHITE);
     if (have) {
         char date[48], *p = date;
         int mi = (t.month >= 1 && t.month <= 12) ? t.month - 1 : 0;
@@ -179,8 +182,9 @@ static void draw_lock(ugfx_t *g) {
 
 static void draw_desktop(ugfx_t *g, int pos, int focus) {
     int W = (int)g->width, H = (int)g->height;
-    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
-    ua_text_center(g, UAFONT_HEAD, 0, W, H / 2 - 10, "Avolis", AV_DIM);
+    avwall_render(g, walls[wp].seed, walls[wp].warm);
+    ugfx_glow_dot(g, 30, 46, 5, AV_ORANGE);
+    av_text_glow(g, UAFONT_HEAD, 52, 56, "AVOLIS", AV_ORANGE);
 
     int horiz = (pos == TB_BOTTOM || pos == TB_TOP);
     int bx, by, bw, bh;
@@ -247,8 +251,8 @@ static void draw_palette(ugfx_t *g, int pos, int sel) {
 
 static void draw_apps(ugfx_t *g, int sel) {
     int W = (int)g->width, H = (int)g->height;
-    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
-    av_head(g, 40, 56, "Applications", AV_ORANGE);
+    avwall_render(g, walls[wp].seed, walls[wp].warm);
+    av_text_glow(g, UAFONT_HEAD, 40, 56, "Applications", AV_ORANGE);
 
     int tw = 150, th = 92, gap = 24;
     int gw = APPS_COLS * tw + (APPS_COLS - 1) * gap;
@@ -266,8 +270,8 @@ static void draw_apps(ugfx_t *g, int sel) {
 
 static void draw_settings(ugfx_t *g, int srow, int pos) {
     int W = (int)g->width, H = (int)g->height;
-    ugfx_vgradient(g, 0, 0, W, H, walls[wp].top, walls[wp].bot);
-    av_head(g, 40, 56, "Settings", AV_ORANGE);
+    avwall_render(g, walls[wp].seed, walls[wp].warm);
+    av_text_glow(g, UAFONT_HEAD, 40, 56, "Settings", AV_ORANGE);
 
     const char *labels[2] = {"Wallpaper", "Taskbar position"};
     const char *values[2] = {walls[wp].name, tb_names[pos]};

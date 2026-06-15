@@ -96,6 +96,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc h a r d c a p dot e l f ret \
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
+               r u n spc a v w a l l t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s d esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -606,6 +607,15 @@ if grep -q "avui: ok" "$SERIAL_LOG"; then
     echo "PASS: Avolis UI primitives render (gradient, panel, button)"
 else
     echo "FAIL: Avolis UI primitives misbehaved" >&2
+    fail=1
+fi
+
+# Constellation wallpaper: avwalltest renders the AI-network background and
+# confirms glowing orange node/line pixels are present.
+if grep -q "avwall: ok" "$SERIAL_LOG"; then
+    echo "PASS: constellation wallpaper renders (nodes + mesh)"
+else
+    echo "FAIL: constellation wallpaper missing" >&2
     fail=1
 fi
 
