@@ -277,6 +277,75 @@ static void uptime_str(char *out) {
     p += 2;
     *p = '\0';
 }
+
+/* --- settings persistence (AVOLIS.CFG on the FAT disk) --- */
+static int cfg_int(const char *buf, const char *key) {
+    for (const char *s = buf; *s;) {
+        int i = 0;
+        while (key[i] && s[i] == key[i])
+            i++;
+        if (key[i] == '\0' && s[i] == '=') {
+            s += i + 1;
+            int v = 0, any = 0;
+            while (*s >= '0' && *s <= '9') {
+                v = v * 10 + (*s - '0');
+                s++;
+                any = 1;
+            }
+            return any ? v : -1;
+        }
+        while (*s && *s != '\n')
+            s++;
+        if (*s == '\n')
+            s++;
+    }
+    return -1;
+}
+static void avolis_save(void) {
+    char buf[160], *p = buf;
+    p = put_s(p, "wallpaper=");
+    p = put_i(p, wp);
+    *p++ = '\n';
+    p = put_s(p, "taskbar=");
+    p = put_i(p, pos);
+    *p++ = '\n';
+    p = put_s(p, "volume=");
+    p = put_i(p, volume);
+    *p++ = '\n';
+    p = put_s(p, "mousespeed=");
+    p = put_i(p, mspeed);
+    *p++ = '\n';
+    p = put_s(p, "timefmt=");
+    p = put_i(p, timefmt);
+    *p++ = '\n';
+    *p = '\0';
+    if (sys_disk_write("AVOLIS.CFG", buf, (int)(p - buf)) > 0)
+        uprintf("avolis: cfg saved\n");
+}
+static void avolis_load(void) {
+    char buf[160];
+    int n = sys_disk_read("AVOLIS.CFG", buf, 159);
+    if (n <= 0)
+        return;
+    buf[n] = '\0';
+    int v;
+    if ((v = cfg_int(buf, "wallpaper")) >= 0 && v < NWALLS)
+        wp = v;
+    if ((v = cfg_int(buf, "taskbar")) >= 0 && v < 4)
+        pos = v;
+    if ((v = cfg_int(buf, "volume")) >= 0) {
+        volume = v;
+        sys_audio_volume(volume);
+    }
+    if ((v = cfg_int(buf, "mousespeed")) >= 0 && v < NMSPEED) {
+        mspeed = v;
+        sys_mouse_speed(mouse_speeds[mspeed]);
+    }
+    if ((v = cfg_int(buf, "timefmt")) >= 0)
+        timefmt = v ? 1 : 0;
+    uprintf("avolis: cfg loaded\n");
+}
+
 static void settings_change(int c, int row, int dir) {
     if (c == CAT_PERSONAL) {
         if (row == 0) {
@@ -310,7 +379,9 @@ static void settings_change(int c, int row, int dir) {
             else
                 sys_reboot();
         }
+        return; /* nothing to persist for power actions */
     }
+    avolis_save(); /* persist the change to disk */
 }
 
 /* Fill labels[]/values[] for a category's detail rows; returns the count.
@@ -765,6 +836,7 @@ static void handle_key(int k, int *quit) {
         if (k == 'p' || k == 'P') {
             pos = (pos + 1) % 4;
             uprintf("avolis: taskbar %s\n", tb_names[pos]);
+            avolis_save();
         } else if (k == '/')
             open_palette();
         else if (k == 's' || k == 'S') {
@@ -858,6 +930,8 @@ void _start(int argc, char **argv) {
     int quit = 0, cycles = 0, idle = 0, dirty = 1;
     int mx = W / 2, my = H / 2, last_mx = -1, last_my = -1;
     uint32_t btn = 0, last_btn = 0;
+
+    avolis_load(); /* restore saved settings from the disk, if present */
 
     struct mousestate dummy;
     int have_mouse = (sys_mouse(&dummy) == 0);
