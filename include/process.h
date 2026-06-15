@@ -15,6 +15,7 @@ int process_spawn(const char *image_start, const char *image_end,
                   struct file *out);
 
 /* Resolve `fname` to an image (initrd first, then the FAT disk) and spawn it.
- * Returns the pid, or -1 if not found anywhere / on failure. */
+ * linux_abi=1 loads it as a Linux process (Linux entry stack + its int 0x80
+ * routed to the Linux syscall layer). Returns the pid, or -1 on failure. */
 int process_spawn_named(const char *fname, const char *cmdline, int foreground,
-                        struct file *in, struct file *out);
+                        struct file *in, struct file *out, int linux_abi);

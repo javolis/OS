@@ -54,8 +54,12 @@ struct task {
     uint32_t brk;        /* user heap break (SYS_SBRK) */
     uint32_t brk_top;    /* page-aligned ceiling of mapped heap pages */
     char name[16];       /* argv[0], for ps */
+    int linux_abi;       /* 1 = route int 0x80 to the Linux syscall layer */
     struct file *fds[MAX_FDS]; /* 0 = stdin, 1 = stdout */
 };
+
+/* Latch read by the next sched_spawn_user (spawns are serialized). */
+static int pending_linux;
 
 static struct task tasks[MAX_TASKS]; /* slot 0 = boot/idle task */
 static struct task *current;
@@ -128,6 +132,8 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     t->brk = USER_HEAP_BASE;
     t->brk_top = USER_HEAP_BASE;
     copy_name(t->name, name);
+    t->linux_abi = pending_linux;
+    pending_linux = 0;
     for (int i = 0; i < MAX_FDS; i++)
         t->fds[i] = NULL;
     /* stdin/stdout: the given files (e.g. pipe ends) or the console. */
@@ -160,6 +166,14 @@ int sched_spawn_user(uint32_t pd_phys, uint32_t user_eip, uint32_t user_esp,
     __asm__ volatile("" : : : "memory");
     t->state = TASK_READY;
     return (int)t->pid;
+}
+
+void sched_arm_linux(void) {
+    pending_linux = 1;
+}
+
+int sched_current_linux(void) {
+    return current ? current->linux_abi : 0;
 }
 
 static struct task *pick_next(void) {
