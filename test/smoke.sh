@@ -101,7 +101,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a u d i o t e s t dot e l f ret \
                r u n spc r e c t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
-               ret s d esc p ret ret slash d a t e ret q \
+               ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
                r u n spc l s dot e l f ret \
                r u n spc u s h dot e l f spc d e m o dot u s h ret \
