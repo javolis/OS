@@ -49,7 +49,8 @@ fi
 # the filesystem have real, writable storage to exercise.
 DATA_IMG=$(mktemp --suffix=.img)
 dd if=/dev/zero of="$DATA_IMG" bs=1M count=32 status=none
-mformat -i "$DATA_IMG" ::
+# -c 4 (2 KiB clusters over 32 MiB) keeps the cluster count in FAT16 range.
+mformat -c 4 -i "$DATA_IMG" ::
 printf 'hello from the avolis disk\n' > _avdisk.txt
 mcopy -i "$DATA_IMG" _avdisk.txt ::/HELLO.TXT
 rm -f _avdisk.txt
@@ -746,6 +747,16 @@ if grep -q "ata: disk present" "$SERIAL_LOG" \
     echo "PASS: ATA disk detected and boot sector read via PIO"
 else
     echo "FAIL: ATA disk not detected / unreadable" >&2
+    fail=1
+fi
+
+# FAT16: mount the scratch disk and read the file we copied onto it from the
+# host (mcopy), proving end-to-end FAT directory + cluster-chain reads.
+if grep -q "fat: FAT16 mounted" "$SERIAL_LOG" \
+        && grep -q "fat: read HELLO.TXT: hello from the avolis disk" "$SERIAL_LOG"; then
+    echo "PASS: FAT16 mounted and read a host-written file"
+else
+    echo "FAIL: FAT16 mount/read failed" >&2
     fail=1
 fi
 
