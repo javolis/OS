@@ -244,6 +244,25 @@ static inline int sys_audio_record(int16_t *buf, int count) {
     return ret;
 }
 
+/* Keep in sync with the kernel's struct procinfo in include/syscall.h. */
+struct procinfo {
+    uint32_t pid;
+    uint32_t state; /* 1 ready 2 blocked 3 waitkbd 4 waitpid 5 waitchan
+                     * 6 zombie 7 running */
+    char name[16];
+};
+
+/* Fill *out with the index-th task in the table. Returns 0, or -1 past the
+ * end (enumerate by calling with index 0, 1, 2, ... until it returns -1). */
+static inline int sys_ps(int index, struct procinfo *out) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(39), "b"(index), "c"(out)
+                     : "memory");
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

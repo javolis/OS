@@ -91,6 +91,16 @@
                           * count. Captures that many samples via AC'97 DMA,
                           * blocks until filled, copies them out. Returns the
                           * number captured, or -1 if no codec. */
+#define SYS_PS 39 /* ebx = index, ecx = struct procinfo* (writable); fills the
+                   * index-th listed task. Returns 0, or -1 past the end. */
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct procinfo {
+    uint32_t pid;
+    uint32_t state; /* 0 free 1 ready 2 blocked 3 waitkbd 4 waitpid 5 waitchan
+                     * 6 zombie 7 running */
+    char name[16];
+};
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

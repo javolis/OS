@@ -71,6 +71,11 @@ void sched_clear_fd(int fd);
 /* Print the task table via kprintf (the shell's ps command). */
 void sched_ps(void);
 
+/* Enumerate live tasks for SYS_PS: fills *pid/*state/name16 for the
+ * index-th listed task (slot 0 + every non-free slot). Returns 0, or -1
+ * past the end. state codes match struct procinfo (7 = the running task). */
+int sched_proc(int index, uint32_t *pid, uint32_t *state, char *name16);
+
 /* Mark a ready/blocked user task zombie. 0 on success, -1 if no match. */
 int sched_kill(uint32_t pid);
 

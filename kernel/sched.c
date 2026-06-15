@@ -430,6 +430,23 @@ void sched_ps(void) {
     }
 }
 
+int sched_proc(int index, uint32_t *pid, uint32_t *state, char *name16) {
+    int seen = 0;
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (i != 0 && tasks[i].state == TASK_FREE)
+            continue;
+        if (seen == index) {
+            *pid = tasks[i].pid;
+            *state =
+                (&tasks[i] == current) ? 7u : (uint32_t)tasks[i].state;
+            copy_name(name16, tasks[i].name);
+            return 0;
+        }
+        seen++;
+    }
+    return -1;
+}
+
 void sched_start(void) {
     switch_count = 0;
     preempt_on = 1;
