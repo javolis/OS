@@ -945,6 +945,23 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_PS: {
+        if (!user_range_ok(regs->ecx, sizeof(struct procinfo), 1)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct procinfo *pi = (struct procinfo *)regs->ecx;
+        uint32_t pid, st;
+        if (sched_proc((int)regs->ebx, &pid, &st, pi->name) != 0) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        pi->pid = pid;
+        pi->state = st;
+        regs->eax = 0;
+        return;
+    }
+
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
             regs->eax = (uint32_t)-1;

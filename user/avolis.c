@@ -28,7 +28,7 @@ struct app {
 static const struct app bar[] = {
     {"Apps", ""},
     {"Graphics", "gfxdemo.elf"},
-    {"System", "sysinfo.elf"},
+    {"System", "sysmon.elf"},
     {"Settings", ""},
 };
 #define NBAR ((int)(sizeof(bar) / sizeof(bar[0])))
@@ -36,7 +36,7 @@ static const struct app pal[] = {
     {"graphics demo", "gfxdemo.elf"}, {"input demo", "inputdemo.elf"},
     {"system info", "sysinfo.elf"},   {"date", "date.elf"},
     {"files", "files.elf"},           {"network", "netcap.elf"},
-    {"shell", "ush.elf"},
+    {"shell", "ush.elf"},             {"system monitor", "sysmon.elf"},
 };
 #define NPAL ((int)(sizeof(pal) / sizeof(pal[0])))
 
