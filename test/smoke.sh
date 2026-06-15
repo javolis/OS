@@ -53,6 +53,23 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 # (history recall back to 'help') and Enter to re-run it.
 {
     sleep 8
+    # Mouse first: the shell processes keys at 0.2s each over ~1000 keys, so
+    # any program late in the sequence executes ~200s in - too far out to line
+    # up a monitor-driven mouse injection with. Run mousetest up front while
+    # nothing competes for the shell, let it start polling, then inject
+    # movement + a click. It breaks out as soon as it sees both and exits.
+    for key in r u n spc m o u s e t e s t dot e l f ret; do
+        echo "sendkey $key"
+        sleep 0.2
+    done
+    sleep 2
+    for round in 1 2 3 4; do
+        echo "mouse_move 120 -90"; sleep 0.25
+        echo "mouse_move -90 120"; sleep 0.25
+        echo "mouse_button 1"; sleep 0.3
+        echo "mouse_button 0"; sleep 0.5
+    done
+    sleep 1
     for key in h e l p ret \
                l s ret \
                m e m i n f o ret \
@@ -126,28 +143,11 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc t e m p l a t e dot e l f ret \
                r u n spc a p p t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
-               r u n spc s p a w n s t o r m dot e l f ret \
-               r u n spc m o u s e t e s t dot e l f ret; do
+               r u n spc s p a w n s t o r m dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
     done
-    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls. The
-    # shell executes programs far slower than keys are injected, so the moment
-    # mousetest actually starts drifts a lot. QEMU streams serial to a file
-    # live, so wait until mousetest prints its start line, THEN inject movement
-    # + a click (a couple of rounds for safety) squarely inside its poll window.
-    for _ in $(seq 1 80); do
-        grep -q "mouse: start" "$SERIAL_LOG" && break
-        sleep 0.5
-    done
-    sleep 0.5
-    for round in 1 2 3; do
-        echo "mouse_move 120 -90"; sleep 0.3
-        echo "mouse_move -90 120"; sleep 0.3
-        echo "mouse_button 1"; sleep 0.3
-        echo "mouse_button 0"; sleep 0.6
-    done
-    sleep 2
+    sleep 8
     echo "quit"
 } | timeout 240 qemu-system-i386 \
         -cdrom "$ISO" \
