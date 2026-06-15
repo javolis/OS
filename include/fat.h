@@ -13,3 +13,6 @@ int fat_readdir(int index, char *name, uint32_t *size);
 /* Read up to maxlen bytes of a root file (name is dotted 8.3, case-
  * insensitive) into buf. Returns the byte count, or -1 if not found. */
 int fat_read_file(const char *name, void *buf, uint32_t maxlen);
+
+/* Size of a root file in bytes, or -1 if not found. */
+int fat_size(const char *name);

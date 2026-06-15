@@ -179,3 +179,14 @@ int fat_read_file(const char *name, void *buf, uint32_t maxlen) {
     }
     return (int)got;
 }
+
+int fat_size(const char *name) {
+    if (!fs.mounted)
+        return -1;
+    uint8_t want[11];
+    name_to_83(name, want);
+    uint32_t first, size;
+    if (find_entry(-1, want, NULL, &first, &size) != 0)
+        return -1;
+    return (int)size;
+}

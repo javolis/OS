@@ -54,6 +54,10 @@ mformat -c 4 -i "$DATA_IMG" ::
 printf 'hello from the avolis disk\n' > _avdisk.txt
 mcopy -i "$DATA_IMG" _avdisk.txt ::/HELLO.TXT
 rm -f _avdisk.txt
+# Build an app that is NOT in the initrd and place it on the disk only, to
+# prove load-and-run straight from the FAT volume (the downloaded-app path).
+make user/diskapp.elf >/dev/null
+mcopy -i "$DATA_IMG" user/diskapp.elf ::/DISKAPP.ELF
 
 echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 
@@ -114,6 +118,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc s y s m o n dot e l f spc t e s t ret \
                r u n spc c a l e n d a r dot e l f spc t e s t ret \
                r u n spc e d i t dot e l f spc t e s t ret \
+               r u n spc d i s k a p p dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -757,6 +762,15 @@ if grep -q "fat: FAT16 mounted" "$SERIAL_LOG" \
     echo "PASS: FAT16 mounted and read a host-written file"
 else
     echo "FAIL: FAT16 mount/read failed" >&2
+    fail=1
+fi
+
+# Run-from-disk: diskapp.elf is only on the FAT volume (never in the initrd),
+# so running it proves the OS loads + executes an app straight off the disk.
+if grep -q "diskapp: hello from the FAT disk" "$SERIAL_LOG"; then
+    echo "PASS: loaded and ran an app from the FAT disk"
+else
+    echo "FAIL: could not run an app from the disk" >&2
     fail=1
 fi
 
