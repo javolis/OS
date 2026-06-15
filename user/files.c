@@ -6,7 +6,7 @@
  * (it cannot see pixels). */
 #include "avui.h"
 
-#define MAXF 64
+#define MAXF 160
 #define VIEWCAP 8192
 
 static char names[MAXF][32];
