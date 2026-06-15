@@ -59,11 +59,37 @@ static const char *months[12] = {
 static const char *wdays[7] = {"Sunday",    "Monday", "Tuesday", "Wednesday",
                                "Thursday", "Friday", "Saturday"};
 
+/* Settings categories (a sidebar, like a real OS settings app). */
+enum {
+    CAT_SYSTEM,
+    CAT_DISPLAY,
+    CAT_SOUND,
+    CAT_NETWORK,
+    CAT_PERSONAL,
+    CAT_DATETIME,
+    NCAT
+};
+static const char *cat_names[NCAT] = {"System",      "Display",  "Sound",
+                                      "Network",     "Personalize",
+                                      "Date & Time"};
+
 /* Shell state (global so mouse and keyboard share the same actions). */
 static int state = LOCK, pos = TB_BOTTOM, focus, sel, srow, wp;
+static int scat;       /* selected settings category */
+static int sdetail;    /* 0 = sidebar focused, 1 = detail pane focused */
+static int timefmt;    /* 0 = 24-hour clock, 1 = 12-hour */
 static char query[32];
 static int qlen;
 static int par_ox, par_oy; /* constellation parallax offset */
+
+/* Number of interactive (changeable) rows in a category's detail pane. */
+static int cat_rows(int c) {
+    if (c == CAT_PERSONAL)
+        return 2;
+    if (c == CAT_DATETIME)
+        return 1;
+    return 0;
+}
 
 /* A classic 12x17 arrow cursor: 0 transparent, 1 white, 2 dark outline. */
 static const unsigned char cursor_bmp[17][12] = {
@@ -119,13 +145,24 @@ static void two(char *b, int v) {
 }
 static void clock_str(char *clk) {
     struct systime t;
-    if (sys_time(&t) == 0) {
-        two(clk, t.hour);
+    if (sys_time(&t) != 0) {
+        put_s(clk, "--:--")[0] = '\0';
+        return;
+    }
+    int h = t.hour;
+    if (timefmt) { /* 12-hour */
+        int hh = h % 12;
+        if (hh == 0)
+            hh = 12;
+        two(clk, hh);
+        clk[2] = ':';
+        two(clk + 3, t.minute);
+        put_s(clk + 5, h < 12 ? " AM" : " PM")[0] = '\0';
+    } else {
+        two(clk, h);
         clk[2] = ':';
         two(clk + 3, t.minute);
         clk[5] = '\0';
-    } else {
-        put_s(clk, "--:--")[0] = '\0';
     }
 }
 static int lc(int c) { return (c >= 'A' && c <= 'Z') ? c + 32 : c; }
@@ -152,6 +189,180 @@ static int pal_filter(int *out) {
 }
 static void wall(ugfx_t *g) {
     avwall_render(g, walls[wp].seed, walls[wp].warm, par_ox, par_oy);
+}
+
+/* --- system-info getters for the Settings app --- */
+static void cpu_brand(char *out) {
+    unsigned a, b, c, d;
+    __asm__ volatile("cpuid"
+                     : "=a"(a), "=b"(b), "=c"(c), "=d"(d)
+                     : "a"(0x80000000u));
+    if (a < 0x80000004u) {
+        put_s(out, "x86 CPU")[0] = '\0';
+        return;
+    }
+    unsigned regs[12];
+    int i = 0;
+    for (unsigned leaf = 0x80000002u; leaf <= 0x80000004u; leaf++) {
+        __asm__ volatile("cpuid"
+                         : "=a"(a), "=b"(b), "=c"(c), "=d"(d)
+                         : "a"(leaf));
+        regs[i++] = a;
+        regs[i++] = b;
+        regs[i++] = c;
+        regs[i++] = d;
+    }
+    const char *src = (const char *)regs;
+    while (*src == ' ')
+        src++; /* Intel left-pads the brand string */
+    int n = 0;
+    while (src[n] && n < 47) {
+        out[n] = src[n];
+        n++;
+    }
+    out[n] = '\0';
+}
+static char *put_ip(char *p, unsigned ip) {
+    p = put_i(p, (int)((ip >> 24) & 0xFF));
+    *p++ = '.';
+    p = put_i(p, (int)((ip >> 16) & 0xFF));
+    *p++ = '.';
+    p = put_i(p, (int)((ip >> 8) & 0xFF));
+    *p++ = '.';
+    p = put_i(p, (int)(ip & 0xFF));
+    *p = '\0';
+    return p;
+}
+static void mem_str(char *out) {
+    struct sysinfo si;
+    if (sys_sysinfo(&si) != 0) {
+        put_s(out, "?")[0] = '\0';
+        return;
+    }
+    unsigned total = si.total_frames / 256; /* *4 KiB / 1 MiB */
+    unsigned used = (si.total_frames - si.free_frames) / 256;
+    char *p = put_i(out, (int)used);
+    p = put_s(p, " / ");
+    p = put_i(p, (int)total);
+    put_s(p, " MB")[0] = '\0';
+}
+static void uptime_str(char *out) {
+    struct sysinfo si;
+    if (sys_sysinfo(&si) != 0) {
+        put_s(out, "?")[0] = '\0';
+        return;
+    }
+    unsigned s = si.ticks / 100;
+    char *p = put_i(out, (int)(s / 3600));
+    *p++ = ':';
+    two(p, (int)((s / 60) % 60));
+    p += 2;
+    *p++ = ':';
+    two(p, (int)(s % 60));
+    p += 2;
+    *p = '\0';
+}
+static void settings_change(int c, int row, int dir) {
+    if (c == CAT_PERSONAL) {
+        if (row == 0) {
+            wp = (wp + NWALLS + dir) % NWALLS;
+            uprintf("avolis: wallpaper %s\n", walls[wp].name);
+        } else {
+            pos = (pos + 4 + dir) % 4;
+            uprintf("avolis: taskbar %s\n", tb_names[pos]);
+        }
+    } else if (c == CAT_DATETIME) {
+        timefmt = !timefmt;
+        uprintf("avolis: timefmt %s\n", timefmt ? "12h" : "24h");
+    }
+}
+
+/* Fill labels[]/values[] for a category's detail rows; returns the count.
+ * The first cat_rows(c) of them are the interactive ones. */
+static int settings_content(ugfx_t *g, int c, char labels[][24],
+                            char values[][48]) {
+    int n = 0;
+    if (c == CAT_SYSTEM) {
+        put_s(labels[n], "Edition");
+        put_s(values[n++], "Avolis OS");
+        put_s(labels[n], "Version");
+        put_s(values[n++], "0.13");
+        put_s(labels[n], "Kernel");
+        put_s(values[n++], "javolis i686");
+        put_s(labels[n], "Processor");
+        cpu_brand(values[n++]);
+        put_s(labels[n], "Memory");
+        mem_str(values[n++]);
+        put_s(labels[n], "Uptime");
+        uptime_str(values[n++]);
+    } else if (c == CAT_DISPLAY) {
+        char *p;
+        put_s(labels[n], "Resolution");
+        p = put_i(values[n], (int)g->width);
+        *p++ = ' ';
+        *p++ = 'x';
+        *p++ = ' ';
+        p = put_i(p, (int)g->height);
+        *p = '\0';
+        n++;
+        put_s(labels[n], "Color depth");
+        p = put_i(values[n], (int)g->bpp);
+        put_s(p, "-bit")[0] = '\0';
+        n++;
+        put_s(labels[n], "Set at");
+        put_s(values[n++], "boot (GRUB)");
+    } else if (c == CAT_SOUND) {
+        int16_t probe;
+        put_s(labels[n], "Output device");
+        put_s(values[n++], sys_audio(&probe, 0) == 0 ? "AC'97 codec" : "None");
+        put_s(labels[n], "Format");
+        put_s(values[n++], "48 kHz 16-bit");
+    } else if (c == CAT_NETWORK) {
+        struct netinfo ni;
+        int up = (sys_netinfo(&ni) == 0);
+        put_s(labels[n], "Status");
+        put_s(values[n++], up ? "Connected" : "Not connected");
+        if (up) {
+            put_s(labels[n], "IP address");
+            put_ip(values[n++], ni.ip);
+            put_s(labels[n], "Gateway");
+            put_ip(values[n++], ni.gateway);
+            put_s(labels[n], "DNS");
+            put_ip(values[n++], ni.dns);
+        }
+    } else if (c == CAT_PERSONAL) {
+        put_s(labels[n], "Wallpaper");
+        put_s(values[n++], walls[wp].name);
+        put_s(labels[n], "Taskbar");
+        put_s(values[n++], tb_names[pos]);
+    } else if (c == CAT_DATETIME) {
+        struct systime t;
+        char *p;
+        if (sys_time(&t) == 0) {
+            put_s(labels[n], "Date");
+            p = put_s(values[n], months[(t.month >= 1 && t.month <= 12)
+                                            ? t.month - 1
+                                            : 0]);
+            *p++ = ' ';
+            p = put_i(p, t.day);
+            *p++ = ',';
+            *p++ = ' ';
+            p = put_i(p, t.year);
+            *p = '\0';
+            n++;
+            put_s(labels[n], "Time");
+            two(values[n], t.hour);
+            values[n][2] = ':';
+            two(values[n] + 3, t.minute);
+            values[n][5] = ':';
+            two(values[n] + 6, t.second);
+            values[n][8] = '\0';
+            n++;
+        }
+        put_s(labels[n], "Time format");
+        put_s(values[n++], timefmt ? "12-hour" : "24-hour");
+    }
+    return n;
 }
 
 /* --- taskbar geometry (shared by draw + hit-test) --- */
@@ -206,7 +417,7 @@ static void draw_lock(ugfx_t *g) {
     wall(g);
     ugfx_glow_dot(g, 30, 46, 5, AV_ORANGE);
     av_text_glow(g, UAFONT_HEAD, 52, 56, "AVOLIS", AV_ORANGE);
-    char clk[6];
+    char clk[12];
     clock_str(clk);
     int cw = ua_text_width(UAFONT_DISPLAY, clk);
     av_text_glow(g, UAFONT_DISPLAY, (W - cw) / 2, H / 2, clk, AV_WHITE);
@@ -243,7 +454,7 @@ static void draw_desktop(ugfx_t *g) {
         tb_item_rect(W, H, i, &ix, &iy, &iw, &ih);
         av_button(g, ix, iy, iw, ih, bar[i].label, i == focus);
     }
-    char clk[6];
+    char clk[12];
     clock_str(clk);
     if (horiz)
         ua_text(g, UAFONT_BODY, bx + bw - 64, by + bh / 2 + 6, clk, AV_GRAY);
@@ -301,23 +512,61 @@ static void draw_palette(ugfx_t *g) {
     }
 }
 
+/* Settings layout (shared by draw + hit-test). */
+#define SET_SBX 36
+#define SET_SBY 100
+#define SET_SBW 210
+#define SET_ROWH 48
+#define SET_DROWH 52
+static void set_detail_origin(ugfx_t *g, int *dx, int *dy) {
+    (void)g;
+    *dx = SET_SBX + SET_SBW + 36;
+    *dy = SET_SBY + 8;
+}
+
 static void draw_settings(ugfx_t *g) {
     int W = (int)g->width, H = (int)g->height;
     wall(g);
     av_text_glow(g, UAFONT_HEAD, 40, 56, "Settings", AV_ORANGE);
-    const char *labels[2] = {"Wallpaper", "Taskbar position"};
-    const char *values[2] = {walls[wp].name, tb_names[pos]};
-    int rx = 80, ry0 = 170, rh = 66;
-    for (int r = 0; r < 2; r++) {
-        int y = ry0 + r * rh;
-        if (r == srow)
-            ugfx_round_rect(g, rx - 18, y - 30, W - 2 * (rx - 18), 46, 8,
+
+    /* Sidebar of categories. */
+    av_panel(g, SET_SBX, SET_SBY, SET_SBW, NCAT * SET_ROWH + 16, sdetail == 0);
+    for (int i = 0; i < NCAT; i++) {
+        int y = SET_SBY + 12 + i * SET_ROWH;
+        if (i == scat)
+            ugfx_round_rect(g, SET_SBX + 10, y, SET_SBW - 20, SET_ROWH - 6, 6,
                             AV_PANEL2);
-        av_text(g, rx, y, labels[r], AV_GRAY);
-        av_text(g, rx + 340, y, values[r], r == srow ? AV_ORANGE : AV_WHITE);
+        av_text(g, SET_SBX + 26, y + SET_ROWH - 20, cat_names[i],
+                i == scat ? AV_ORANGE : AV_WHITE);
     }
-    ua_text_center(g, UAFONT_BODY, 0, W, H - 48,
-                   "click/enter or a/d change    -    esc back", AV_DIM);
+
+    /* Detail pane for the selected category. */
+    int dx, dy;
+    set_detail_origin(g, &dx, &dy);
+    av_head(g, dx, dy + 26, cat_names[scat], AV_WHITE);
+    char labels[8][24], values[8][48];
+    int n = settings_content(g, scat, labels, values);
+    int ni = cat_rows(scat);
+    int base = n - ni; /* the interactive rows are the trailing ni rows */
+    for (int r = 0; r < n; r++) {
+        int y = dy + 70 + r * SET_DROWH;
+        int interactive = (r >= base);
+        int focused = (sdetail == 1 && interactive && (r - base) == srow);
+        if (focused)
+            ugfx_round_rect(g, dx - 14, y - 2, W - dx - 40, SET_DROWH - 8, 8,
+                            AV_PANEL2);
+        av_text(g, dx, y + 26, labels[r], AV_GRAY);
+        av_text(g, dx + 190, y + 26, values[r],
+                focused ? AV_ORANGE : (interactive ? AV_WHITE : AV_GRAY));
+        if (interactive)
+            av_text(g, W - 72, y + 26, "<  >", focused ? AV_ORANGE : AV_DIM);
+    }
+
+    ua_text_center(g, UAFONT_BODY, 0, W, H - 44,
+                   sdetail == 0
+                       ? "up/down pick    enter open    esc desktop"
+                       : "up/down row    a/d change    esc back",
+                   AV_DIM);
 }
 
 static void render(ugfx_t *g, int mx, int my) {
@@ -361,6 +610,8 @@ static void activate(void) {
         if (bar[focus].elf[0])
             launch(bar[focus].elf);
         else if (ustreq(bar[focus].label, "Settings")) {
+            scat = CAT_SYSTEM;
+            sdetail = 0;
             srow = 0;
             state = SETTINGS;
             uprintf("avolis: settings\n");
@@ -382,12 +633,13 @@ static void activate(void) {
         }
         state = DESKTOP;
     } else if (state == SETTINGS) {
-        if (srow == 0) {
-            wp = (wp + 1) % NWALLS;
-            uprintf("avolis: wallpaper %s\n", walls[wp].name);
+        if (sdetail == 0) {
+            if (cat_rows(scat) > 0) { /* open an interactive category */
+                sdetail = 1;
+                srow = 0;
+            }
         } else {
-            pos = (pos + 1) % 4;
-            uprintf("avolis: taskbar %s\n", tb_names[pos]);
+            settings_change(scat, srow, +1);
         }
     }
 }
@@ -418,11 +670,29 @@ static void hover(ugfx_t *g, int mx, int my) {
             if (inrect(mx, my, px + 16, py + 92 + i * 38, pw - 32, 34))
                 sel = i;
     } else if (state == SETTINGS) {
-        int rx = 80, ry0 = 170, rh = 66;
-        for (int r = 0; r < 2; r++)
-            if (inrect(mx, my, rx - 18, ry0 + r * rh - 30, W - 2 * (rx - 18),
-                       46))
-                srow = r;
+        for (int i = 0; i < NCAT; i++) {
+            int y = SET_SBY + 12 + i * SET_ROWH;
+            if (inrect(mx, my, SET_SBX + 10, y, SET_SBW - 20, SET_ROWH - 6)) {
+                scat = i;
+                sdetail = 0;
+            }
+        }
+        int ni = cat_rows(scat);
+        if (ni > 0) {
+            int dx, dy;
+            set_detail_origin(g, &dx, &dy);
+            char labels[8][24], values[8][48];
+            int n = settings_content(g, scat, labels, values);
+            int base = n - ni;
+            for (int r = base; r < n; r++) {
+                int y = dy + 70 + r * SET_DROWH;
+                if (inrect(mx, my, dx - 14, y - 2, W - dx - 40,
+                           SET_DROWH - 8)) {
+                    sdetail = 1;
+                    srow = r - base;
+                }
+            }
+        }
     }
 }
 
@@ -439,6 +709,8 @@ static void handle_key(int k, int *quit) {
         } else if (k == '/')
             open_palette();
         else if (k == 's' || k == 'S') {
+            scat = CAT_SYSTEM;
+            sdetail = 0;
             srow = 0;
             state = SETTINGS;
             uprintf("avolis: settings\n");
@@ -466,22 +738,30 @@ static void handle_key(int k, int *quit) {
         } else if (k == '\n' || k == '\r')
             activate();
     } else if (state == SETTINGS) {
-        if (k == 27)
-            state = DESKTOP;
-        else if (k == K_UP) {
-            if (srow > 0)
-                srow--;
-        } else if (k == K_DOWN) {
-            if (srow < 1)
-                srow++;
-        } else if (k == 'a') {
-            if (srow == 0)
-                wp = (wp + NWALLS - 1) % NWALLS;
-            else
-                pos = (pos + 3) % 4;
-            uprintf("avolis: %s\n", srow == 0 ? walls[wp].name : tb_names[pos]);
-        } else if (k == 'd' || k == '\n' || k == '\r')
-            activate();
+        if (sdetail == 0) { /* sidebar */
+            if (k == 27)
+                state = DESKTOP;
+            else if (k == K_UP)
+                scat = (scat + NCAT - 1) % NCAT;
+            else if (k == K_DOWN)
+                scat = (scat + 1) % NCAT;
+            else if (k == '\n' || k == '\r')
+                activate(); /* open the category */
+        } else { /* detail pane */
+            int ni = cat_rows(scat);
+            if (k == 27)
+                sdetail = 0;
+            else if (k == K_UP) {
+                if (srow > 0)
+                    srow--;
+            } else if (k == K_DOWN) {
+                if (srow < ni - 1)
+                    srow++;
+            } else if (k == 'a')
+                settings_change(scat, srow, -1);
+            else if (k == 'd' || k == '\n' || k == '\r')
+                settings_change(scat, srow, +1);
+        }
     } else { /* PALETTE */
         if (k == 27)
             state = DESKTOP;
