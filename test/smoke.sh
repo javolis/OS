@@ -97,6 +97,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
                r u n spc a v w a l l t e s t dot e l f ret \
+               r u n spc b e e p t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s d esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -126,7 +127,6 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a p p t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
                r u n spc s p a w n s t o r m dot e l f ret \
-               r u n spc b e e p t e s t dot e l f ret \
                r u n spc m o u s e t e s t dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
