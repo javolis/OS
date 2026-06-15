@@ -87,6 +87,10 @@
                          * (interleaved L,R, 48 kHz, 16-bit stereo). Plays them
                          * via AC'97 DMA and blocks until drained. Returns the
                          * number of samples played, or -1 if no codec. */
+#define SYS_AUDIO_REC 38 /* ebx = int16 buffer (user, writable), ecx = sample
+                          * count. Captures that many samples via AC'97 DMA,
+                          * blocks until filled, copies them out. Returns the
+                          * number captured, or -1 if no codec. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

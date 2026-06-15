@@ -233,6 +233,17 @@ static inline int sys_audio(const int16_t *samples, int count) {
     return ret;
 }
 
+/* Capture `count` 16-bit PCM samples from the AC'97 input into `buf`. Blocks
+ * until the DMA fills it. Returns the number captured, or -1 if no device. */
+static inline int sys_audio_record(int16_t *buf, int count) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(38), "b"(buf), "c"(count)
+                     : "memory");
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

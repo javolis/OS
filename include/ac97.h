@@ -16,3 +16,12 @@ int ac97_play(const int16_t *samples, uint32_t count);
 
 int ac97_busy(void); /* 1 while the DMA engine is still draining the buffer */
 void ac97_stop(void); /* halt playback */
+
+/* Capture (line/mic in). Start recording `count` 16-bit samples into the
+ * internal capture buffer; returns the count (capped at ac97_capacity()) or
+ * -1 if no codec. Does not block. */
+int ac97_capture_start(uint32_t count);
+int ac97_capture_busy(void); /* 1 while the capture DMA is still filling */
+void ac97_capture_stop(void);
+/* Copy the captured samples out of the internal buffer. */
+void ac97_capture_read(int16_t *out, uint32_t count);

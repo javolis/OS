@@ -26,8 +26,15 @@
 #define NAM_RESET 0x00
 #define NAM_MASTER_VOL 0x02
 #define NAM_PCM_OUT_VOL 0x18
+#define NAM_REC_SELECT 0x1A /* input source select (0 = mic) */
+#define NAM_REC_GAIN 0x1C   /* record gain */
 
-/* Bus master (NABM, BAR1) register offsets. The PCM-out "box" is at 0x10. */
+/* Bus master (NABM, BAR1) register offsets. The PCM-in box is at 0x00, the
+ * PCM-out box at 0x10; both share the same layout. */
+#define NABM_PI_BDBAR 0x00
+#define NABM_PI_LVI 0x05
+#define NABM_PI_SR 0x06
+#define NABM_PI_CR 0x0B
 #define NABM_PO_BDBAR 0x10 /* dword: BDL physical base */
 #define NABM_PO_CIV 0x14   /* byte: current index (RO) */
 #define NABM_PO_LVI 0x15   /* byte: last valid index */
@@ -57,7 +64,9 @@ struct bdl_entry {
 } __attribute__((packed));
 
 static struct bdl_entry bdl[AC97_BDL_ENTRIES] __attribute__((aligned(8)));
+static struct bdl_entry cap_bdl[AC97_BDL_ENTRIES] __attribute__((aligned(8)));
 static int16_t dma_buf[AC97_MAX_SAMPLES] __attribute__((aligned(4)));
+static int16_t cap_buf[AC97_MAX_SAMPLES] __attribute__((aligned(4)));
 
 static uint16_t nam, nabm;
 static int present;
@@ -80,6 +89,8 @@ int ac97_init(void) {
     outw(nam + NAM_RESET, 0x0001);      /* reset the mixer */
     outw(nam + NAM_MASTER_VOL, 0x0000); /* 0 dB attenuation (full volume) */
     outw(nam + NAM_PCM_OUT_VOL, 0x0000);
+    outw(nam + NAM_REC_SELECT, 0x0000); /* capture source: mic, both channels */
+    outw(nam + NAM_REC_GAIN, 0x0000);   /* 0 dB record gain */
 
     /* Reset the PCM-out DMA engine so CIV/LVI/SR start clean. */
     outb(nabm + NABM_PO_CR, CR_RR);
@@ -135,4 +146,45 @@ void ac97_stop(void) {
     if (!present)
         return;
     outb(nabm + NABM_PO_CR, 0x00);
+}
+
+int ac97_capture_start(uint32_t count) {
+    if (!present)
+        return -1;
+    if (count > AC97_MAX_SAMPLES)
+        count = AC97_MAX_SAMPLES;
+
+    /* Halt + reset the capture engine before reprogramming its BDL. */
+    outb(nabm + NABM_PI_CR, CR_RR);
+    for (volatile int i = 0; i < 200000 && (inb(nabm + NABM_PI_CR) & CR_RR);
+         i++) {
+    }
+
+    cap_bdl[0].addr = virt_to_phys(cap_buf);
+    cap_bdl[0].samples = (uint16_t)count;
+    cap_bdl[0].flags = BDL_IOC | BDL_BUP;
+
+    outl(nabm + NABM_PI_BDBAR, virt_to_phys(cap_bdl));
+    outb(nabm + NABM_PI_LVI, 0);
+    outb(nabm + NABM_PI_CR, CR_RPBM); /* run capture */
+    return (int)count;
+}
+
+int ac97_capture_busy(void) {
+    if (!present)
+        return 0;
+    return !(inw(nabm + NABM_PI_SR) & SR_DCH);
+}
+
+void ac97_capture_stop(void) {
+    if (!present)
+        return;
+    outb(nabm + NABM_PI_CR, 0x00);
+}
+
+void ac97_capture_read(int16_t *out, uint32_t count) {
+    if (count > AC97_MAX_SAMPLES)
+        count = AC97_MAX_SAMPLES;
+    for (uint32_t i = 0; i < count; i++)
+        out[i] = cap_buf[i];
 }
