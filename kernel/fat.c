@@ -16,6 +16,8 @@ static struct {
     uint32_t root_start; /* first root-dir sector */
     uint32_t data_start; /* first data sector (cluster 2) */
     uint32_t spc;        /* sectors per cluster */
+    uint32_t spf;        /* sectors per FAT */
+    uint32_t num_fats;   /* number of FAT copies */
     uint32_t root_ents;  /* root directory entries */
     int mounted;
 } fs;
@@ -42,6 +44,8 @@ int fat_mount(void) {
         return -1; /* not FAT12/16 (FAT32 zeroes spf16 + root_ents) */
 
     fs.spc = spc;
+    fs.spf = spf;
+    fs.num_fats = num_fats;
     fs.root_ents = root_ents;
     fs.fat_start = reserved;
     fs.root_start = reserved + num_fats * spf;
@@ -189,4 +193,132 @@ int fat_size(const char *name) {
     if (find_entry(-1, want, NULL, &first, &size) != 0)
         return -1;
     return (int)size;
+}
+
+/* --- write support --- */
+#define MAX_WR_CLUSTERS 256 /* up to 512 KiB at 2 KiB clusters */
+
+/* Write a 16-bit FAT entry to every FAT copy. */
+static void set_fat_entry(uint32_t cluster, uint16_t val) {
+    uint32_t off = cluster * 2;
+    for (uint32_t f = 0; f < fs.num_fats; f++) {
+        uint32_t sec = fs.fat_start + f * fs.spf + off / 512;
+        uint8_t b[512];
+        if (ata_read(sec, 1, b) != 0)
+            return;
+        b[off % 512] = (uint8_t)(val & 0xFF);
+        b[off % 512 + 1] = (uint8_t)((val >> 8) & 0xFF);
+        ata_write(sec, 1, b);
+    }
+}
+
+int fat_write_file(const char *name, const void *buf, uint32_t len) {
+    if (!fs.mounted)
+        return -1;
+    uint32_t clustersz = fs.spc * 512;
+    uint32_t ncl = (len + clustersz - 1) / clustersz; /* 0 if len==0 */
+    if (ncl > MAX_WR_CLUSTERS)
+        return -1;
+
+    uint8_t want[11];
+    name_to_83(name, want);
+    const uint8_t *data = (const uint8_t *)buf;
+
+    /* Locate the dir entry to (re)use: an existing same-named file (whose old
+     * chain we free), else the first deleted/empty slot. */
+    uint32_t entries_per_sec = 512 / 32;
+    uint32_t root_secs = (fs.root_ents * 32 + 511) / 512;
+    uint32_t dir_sec = 0, dir_off = 0;
+    int have_slot = 0;
+    uint8_t b[512];
+    for (uint32_t s = 0; s < root_secs && !have_slot; s++) {
+        if (ata_read(fs.root_start + s, 1, b) != 0)
+            return -1;
+        for (uint32_t e = 0; e < entries_per_sec; e++) {
+            uint8_t *d = b + e * 32;
+            if (d[0] == 0x00) {
+                dir_sec = fs.root_start + s;
+                dir_off = e * 32;
+                have_slot = 1;
+                break;
+            }
+            if (d[0] == 0xE5) {
+                if (!dir_sec) {
+                    dir_sec = fs.root_start + s;
+                    dir_off = e * 32;
+                }
+                continue;
+            }
+            if ((d[11] & 0x0F) == 0x0F || (d[11] & 0x08))
+                continue;
+            int match = 1;
+            for (int i = 0; i < 11; i++)
+                if (d[i] != want[i]) {
+                    match = 0;
+                    break;
+                }
+            if (match) {
+                uint32_t c = rd16(d + 26); /* free the old cluster chain */
+                while (c >= 2 && c < 0xFFF8) {
+                    uint16_t nx = fat_entry(c);
+                    set_fat_entry(c, 0);
+                    c = nx;
+                }
+                dir_sec = fs.root_start + s;
+                dir_off = e * 32;
+                have_slot = 1;
+                break;
+            }
+        }
+    }
+    if (!have_slot && dir_sec) /* used a recorded deleted slot */
+        have_slot = 1;
+    if (!have_slot)
+        return -1; /* root directory full */
+
+    /* Allocate `ncl` free clusters. */
+    static uint32_t clusters[MAX_WR_CLUSTERS]; /* keep off the kernel stack */
+    uint32_t max_cluster = 2 + (ata_sectors() - fs.data_start) / fs.spc;
+    uint32_t got = 0;
+    for (uint32_t c = 2; c < max_cluster && got < ncl; c++)
+        if (fat_entry(c) == 0x0000)
+            clusters[got++] = c;
+    if (got < ncl)
+        return -1; /* not enough free space */
+
+    /* Write the data into the clusters (zero-padding the final sector). */
+    for (uint32_t i = 0; i < ncl; i++) {
+        uint32_t lba = fs.data_start + (clusters[i] - 2) * fs.spc;
+        for (uint32_t s = 0; s < fs.spc; s++) {
+            uint8_t sec[512];
+            uint32_t base = (i * fs.spc + s) * 512;
+            for (uint32_t k = 0; k < 512; k++)
+                sec[k] = (base + k < len) ? data[base + k] : 0;
+            ata_write(lba + s, 1, sec);
+        }
+    }
+
+    /* Chain the clusters in the FAT. */
+    for (uint32_t i = 0; i < ncl; i++)
+        set_fat_entry(clusters[i],
+                      (i + 1 < ncl) ? (uint16_t)clusters[i + 1] : 0xFFFF);
+
+    /* Write the directory entry. */
+    if (ata_read(dir_sec, 1, b) != 0)
+        return -1;
+    uint8_t *d = b + dir_off;
+    for (int i = 0; i < 11; i++)
+        d[i] = want[i];
+    d[11] = 0x20; /* archive */
+    for (int i = 12; i < 26; i++)
+        d[i] = 0;
+    uint16_t fc = ncl ? (uint16_t)clusters[0] : 0;
+    d[26] = (uint8_t)(fc & 0xFF);
+    d[27] = (uint8_t)((fc >> 8) & 0xFF);
+    d[28] = (uint8_t)(len & 0xFF);
+    d[29] = (uint8_t)((len >> 8) & 0xFF);
+    d[30] = (uint8_t)((len >> 16) & 0xFF);
+    d[31] = (uint8_t)((len >> 24) & 0xFF);
+    ata_write(dir_sec, 1, b);
+    return (int)len;
 }
