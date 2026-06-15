@@ -45,6 +45,15 @@ while True:
     ECHO_PID=$!
 fi
 
+# A scratch FAT16 disk on the primary IDE master so the ATA driver + (later)
+# the filesystem have real, writable storage to exercise.
+DATA_IMG=$(mktemp --suffix=.img)
+dd if=/dev/zero of="$DATA_IMG" bs=1M count=32 status=none
+mformat -i "$DATA_IMG" ::
+printf 'hello from the avolis disk\n' > _avdisk.txt
+mcopy -i "$DATA_IMG" _avdisk.txt ::/HELLO.TXT
+rm -f _avdisk.txt
+
 echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
 
 # Feed monitor commands on a delay so the kernel has booted before we type,
@@ -158,6 +167,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
     echo "quit"
 } | timeout 360 qemu-system-i386 \
         -cdrom "$ISO" \
+        -boot d \
+        -drive file="$DATA_IMG",format=raw,if=ide,index=0 \
         -display none \
         -serial "file:$SERIAL_LOG" \
         -monitor stdio \
@@ -728,6 +739,16 @@ else
     fail=1
 fi
 
+# ATA disk: the primary-master scratch image must be detected and its FAT
+# boot sector read back (proves PIO sector reads work).
+if grep -q "ata: disk present" "$SERIAL_LOG" \
+        && grep -q "ata: boot sector ok" "$SERIAL_LOG"; then
+    echo "PASS: ATA disk detected and boot sector read via PIO"
+else
+    echo "FAIL: ATA disk not detected / unreadable" >&2
+    fail=1
+fi
+
 # Avolis shell, full v1 flow: unlock -> settings (change wallpaper, Esc back,
 # which also exercises the new Esc keymap) -> move taskbar -> applications
 # overview (launch gfxdemo) -> command palette (type "date", launch date.elf)
@@ -1055,5 +1076,6 @@ else
     fail=1
 fi
 rm -f "$POWER_LOG"
+rm -f "$DATA_IMG"
 
 exit $fail

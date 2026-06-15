@@ -3,6 +3,7 @@
 
 #include "ac97.h"
 #include "arp.h"
+#include "ata.h"
 #include "dhcp.h"
 #include "fb.h"
 #include "gdt.h"
@@ -115,6 +116,9 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
 
     /* AC'97 audio controller (PCM output via bus-master DMA). */
     ac97_init();
+
+    /* ATA disk (persistent storage), if one is attached. */
+    ata_init();
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs
