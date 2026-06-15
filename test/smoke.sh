@@ -131,14 +131,18 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
         echo "sendkey $key"
         sleep 0.2
     done
-    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls.
-    sleep 1
-    echo "mouse_move 160 0"; sleep 0.4
-    echo "mouse_move 0 120"; sleep 0.4
-    echo "mouse_move 80 60"; sleep 0.4
-    echo "mouse_button 1"; sleep 0.4
-    echo "mouse_button 0"; sleep 0.4
-    sleep 8
+    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls. The
+    # exact moment mousetest starts drifts with how long the earlier programs
+    # take, so inject movement + a click repeatedly across a wide window
+    # (mousetest polls ~15s); some round is guaranteed to land while it runs.
+    sleep 2
+    for round in 1 2 3 4 5 6 7 8; do
+        echo "mouse_move 120 -90"; sleep 0.25
+        echo "mouse_move -90 120"; sleep 0.25
+        echo "mouse_button 1"; sleep 0.25
+        echo "mouse_button 0"; sleep 0.75
+    done
+    sleep 3
     echo "quit"
 } | timeout 240 qemu-system-i386 \
         -cdrom "$ISO" \
