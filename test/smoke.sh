@@ -797,8 +797,9 @@ if grep -q "avolis: mouse ready" "$SERIAL_LOG" \
         && grep -q "avolis: run gfxdemo.elf" "$SERIAL_LOG" \
         && grep -q "avolis: palette" "$SERIAL_LOG" \
         && grep -q "avolis: run date.elf" "$SERIAL_LOG" \
+        && grep -q "avolis: cfg saved" "$SERIAL_LOG" \
         && grep -q "avolis: bye" "$SERIAL_LOG"; then
-    echo "PASS: Avolis v1 full flow (lock, settings, taskbar, apps, palette, mouse)"
+    echo "PASS: Avolis v1 full flow (lock, settings, taskbar, apps, palette, mouse, cfg)"
 else
     echo "FAIL: Avolis shell interactions broke" >&2
     fail=1
