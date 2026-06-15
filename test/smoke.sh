@@ -103,6 +103,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc f i l e s dot e l f spc t e s t ret \
                r u n spc s y s m o n dot e l f spc t e s t ret \
                r u n spc c a l e n d a r dot e l f spc t e s t ret \
+               r u n spc e d i t dot e l f spc t e s t ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -714,6 +715,15 @@ if grep -q "calendar: ok" "$SERIAL_LOG" \
     echo "PASS: Clock & Calendar rendered from the RTC"
 else
     echo "FAIL: Clock & Calendar did not render" >&2
+    fail=1
+fi
+
+# Text editor: builds a buffer, saves it to the ramfs, reloads and compares.
+if grep -q "edit: saved" "$SERIAL_LOG" \
+        && grep -q "edit: ok" "$SERIAL_LOG"; then
+    echo "PASS: Text editor saved and reloaded a file"
+else
+    echo "FAIL: Text editor save/reload round-trip failed" >&2
     fail=1
 fi
 

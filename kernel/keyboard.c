@@ -98,6 +98,10 @@ static void keyboard_irq(struct registers *regs) {
             push(KEY_UP);
         else if (scancode == 0x50)
             push(KEY_DOWN);
+        else if (scancode == 0x4B)
+            push(KEY_LEFT);
+        else if (scancode == 0x4D)
+            push(KEY_RIGHT);
         else if (scancode == SC_CTRL)
             ctrl_held = 1; /* right ctrl */
         return; /* other extended keys still ignored */
