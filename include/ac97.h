@@ -17,6 +17,11 @@ int ac97_play(const int16_t *samples, uint32_t count);
 int ac97_busy(void); /* 1 while the DMA engine is still draining the buffer */
 void ac97_stop(void); /* halt playback */
 
+/* Master + PCM-out volume as a 0-100% level. ac97_set_volume returns the
+ * clamped level, or -1 if no codec; ac97_volume returns the current level. */
+int ac97_set_volume(int pct);
+int ac97_volume(void);
+
 /* Capture (line/mic in). Start recording `count` 16-bit samples into the
  * internal capture buffer; returns the count (capped at ac97_capacity()) or
  * -1 if no codec. Does not block. */

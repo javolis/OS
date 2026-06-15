@@ -70,6 +70,7 @@ static int16_t cap_buf[AC97_MAX_SAMPLES] __attribute__((aligned(4)));
 
 static uint16_t nam, nabm;
 static int present;
+static int cur_vol = 100; /* master volume percent */
 
 int ac97_init(void) {
     const struct pci_device *dev = pci_find(AC97_VENDOR, AC97_DEVICE);
@@ -187,4 +188,30 @@ void ac97_capture_read(int16_t *out, uint32_t count) {
         count = AC97_MAX_SAMPLES;
     for (uint32_t i = 0; i < count; i++)
         out[i] = cap_buf[i];
+}
+
+/* AC'97 volume registers store attenuation (0 = loudest, higher = quieter,
+ * bit 15 = mute), so map a 0-100% level inversely. */
+int ac97_set_volume(int pct) {
+    if (!present)
+        return -1;
+    if (pct < 0)
+        pct = 0;
+    if (pct > 100)
+        pct = 100;
+    cur_vol = pct;
+    if (pct == 0) {
+        outw(nam + NAM_MASTER_VOL, 0x8000); /* mute */
+        outw(nam + NAM_PCM_OUT_VOL, 0x8000);
+    } else {
+        int att = (100 - pct) * 0x3F / 100;
+        uint16_t v = (uint16_t)((att << 8) | att);
+        outw(nam + NAM_MASTER_VOL, v);
+        outw(nam + NAM_PCM_OUT_VOL, v);
+    }
+    return pct;
+}
+
+int ac97_volume(void) {
+    return present ? cur_vol : -1;
 }

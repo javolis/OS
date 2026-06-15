@@ -93,6 +93,8 @@
                           * number captured, or -1 if no codec. */
 #define SYS_PS 39 /* ebx = index, ecx = struct procinfo* (writable); fills the
                    * index-th listed task. Returns 0, or -1 past the end. */
+#define SYS_AUDIO_VOL 40 /* ebx = level 0-100; sets the AC'97 master volume.
+                          * Returns the clamped level, or -1 if no codec. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct procinfo {

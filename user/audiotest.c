@@ -21,6 +21,7 @@ void _start(void) {
         sys_exit(1);
     }
     uprintf("audio: played %d samples\n", n);
+    uprintf("audio: volume %d\n", sys_audio_volume(60));
     uprintf("audio: ok\n");
     sys_exit(0);
 }

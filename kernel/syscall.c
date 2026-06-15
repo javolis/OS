@@ -962,6 +962,10 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_AUDIO_VOL:
+        regs->eax = (uint32_t)ac97_set_volume((int)regs->ebx);
+        return;
+
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
             regs->eax = (uint32_t)-1;
