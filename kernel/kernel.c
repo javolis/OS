@@ -1,6 +1,7 @@
 /* kernel.c — freestanding kernel entry. */
 #include <stdint.h>
 
+#include "ac97.h"
 #include "arp.h"
 #include "dhcp.h"
 #include "fb.h"
@@ -111,6 +112,9 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
         ip_selftest();
         arp_request(net_gateway()); /* pre-resolve the gateway MAC */
     }
+
+    /* AC'97 audio controller (PCM output via bus-master DMA). */
+    ac97_init();
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs
