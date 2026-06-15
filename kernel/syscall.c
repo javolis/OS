@@ -19,6 +19,7 @@
 #include "paging.h"
 #include "pipe.h"
 #include "pmm.h"
+#include "power.h"
 #include "process.h"
 #include "ramfs.h"
 #include "rtc.h"
@@ -965,6 +966,14 @@ void syscall_handle(struct registers *regs) {
     case SYS_AUDIO_VOL:
         regs->eax = (uint32_t)ac97_set_volume((int)regs->ebx);
         return;
+
+    case SYS_POWEROFF:
+        power_off();
+        return; /* not reached */
+
+    case SYS_REBOOT:
+        power_reboot();
+        return; /* not reached */
 
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {

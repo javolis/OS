@@ -271,6 +271,14 @@ static inline int sys_audio_volume(int level) {
     return ret;
 }
 
+/* Power the machine off / restart it. Neither returns. */
+static inline void sys_poweroff(void) {
+    __asm__ volatile("int $0x80" : : "a"(41));
+}
+static inline void sys_reboot(void) {
+    __asm__ volatile("int $0x80" : : "a"(42));
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

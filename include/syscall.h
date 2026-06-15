@@ -95,6 +95,8 @@
                    * index-th listed task. Returns 0, or -1 past the end. */
 #define SYS_AUDIO_VOL 40 /* ebx = level 0-100; sets the AC'97 master volume.
                           * Returns the clamped level, or -1 if no codec. */
+#define SYS_POWEROFF 41 /* power the machine off (does not return). */
+#define SYS_REBOOT 42   /* restart the machine (does not return). */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct procinfo {
