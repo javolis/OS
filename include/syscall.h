@@ -77,6 +77,9 @@
 #define SYS_TRYGETKEY 34 /* like getkey but non-blocking: returns the next
                           * raw key 0..255, or -1 if none is waiting (or not
                           * foreground). For UI event loops that also tick. */
+#define SYS_MOUSE 35    /* ebx = struct mousestate* (writable); fills the
+                         * cursor x/y and button bitmask. 0, or -1 if there
+                         * is no mouse. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
@@ -89,6 +92,13 @@ struct dirent {
 struct systime {
     uint16_t year;
     uint8_t month, day, hour, minute, second;
+};
+
+/* Keep in sync with the userland copy in user/usys.h. */
+struct mousestate {
+    int32_t x;
+    int32_t y;
+    uint32_t buttons; /* MOUSE_LEFT | MOUSE_RIGHT | MOUSE_MIDDLE */
 };
 
 /* Keep in sync with the userland copy in user/usys.h. */

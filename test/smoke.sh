@@ -125,10 +125,18 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc t e m p l a t e dot e l f ret \
                r u n spc a p p t e s t dot e l f ret \
                r u n spc u s h dot e l f spc t o o l s dot u s h ret \
-               r u n spc s p a w n s t o r m dot e l f ret; do
+               r u n spc s p a w n s t o r m dot e l f ret \
+               r u n spc m o u s e t e s t dot e l f ret; do
         echo "sendkey $key"
         sleep 0.2
     done
+    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls.
+    sleep 1
+    echo "mouse_move 160 0"; sleep 0.4
+    echo "mouse_move 0 120"; sleep 0.4
+    echo "mouse_move 80 60"; sleep 0.4
+    echo "mouse_button 1"; sleep 0.4
+    echo "mouse_button 0"; sleep 0.4
     sleep 8
     echo "quit"
 } | timeout 240 qemu-system-i386 \
@@ -616,6 +624,16 @@ if grep -q "avwall: ok" "$SERIAL_LOG"; then
     echo "PASS: constellation wallpaper renders (nodes + mesh)"
 else
     echo "FAIL: constellation wallpaper missing" >&2
+    fail=1
+fi
+
+# PS/2 mouse: CI injects movement + a click via the QEMU monitor; mousetest
+# reads SYS_MOUSE and reports the cursor moving and the left button.
+if grep -q "mouse: moved to" "$SERIAL_LOG" \
+        && grep -q "mouse: button left" "$SERIAL_LOG"; then
+    echo "PASS: PS/2 mouse reports movement and clicks"
+else
+    echo "FAIL: mouse did not report movement/click" >&2
     fail=1
 fi
 
