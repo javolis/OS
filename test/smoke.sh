@@ -120,6 +120,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc e d i t dot e l f spc t e s t ret \
                r u n spc d i s k a p p dot e l f ret \
                l i n u x spc l x h e l l o dot e l f ret \
+               l i n u x spc l x t e s t dot e l f ret \
                r u n spc p e r s i s t dot e l f spc w ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
@@ -792,6 +793,16 @@ if grep -q "lxhello: hello from the linux abi" "$SERIAL_LOG"; then
     echo "PASS: ran a Linux-ABI binary via the syscall translation layer"
 else
     echo "FAIL: Linux-ABI binary did not run" >&2
+    fail=1
+fi
+
+# Broader Linux syscalls: writev, uname (reports Avolis), getpid.
+if grep -q "lxtest: writev works" "$SERIAL_LOG" \
+        && grep -q "lxtest: uname Avolis" "$SERIAL_LOG" \
+        && grep -q "lxtest: getpid ok" "$SERIAL_LOG"; then
+    echo "PASS: Linux writev/uname/getpid translated correctly"
+else
+    echo "FAIL: broader Linux syscalls did not translate" >&2
     fail=1
 fi
 
