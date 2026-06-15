@@ -97,6 +97,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a a f o n t t e s t dot e l f ret \
                r u n spc a v u i t e s t dot e l f ret \
                r u n spc a v w a l l t e s t dot e l f ret \
+               r u n spc b e e p t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s d esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -130,16 +131,26 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
         echo "sendkey $key"
         sleep 0.2
     done
-    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls.
-    sleep 1
-    echo "mouse_move 160 0"; sleep 0.4
-    echo "mouse_move 0 120"; sleep 0.4
-    echo "mouse_move 80 60"; sleep 0.4
-    echo "mouse_button 1"; sleep 0.4
-    echo "mouse_button 0"; sleep 0.4
-    sleep 8
+    # Drive the PS/2 mouse via the QEMU monitor while mousetest polls. It runs
+    # last (so process PIDs match what the kill/ctrl-c tests expect), which is
+    # ~200s into the key stream. QEMU streams serial to the file live, so wait
+    # until mousetest prints its start line, THEN inject movement + a click
+    # (a few rounds) squarely inside its 15s poll window. The job timeout is
+    # raised well past this so the injection always completes.
+    for _ in $(seq 1 120); do
+        grep -q "mouse: start" "$SERIAL_LOG" && break
+        sleep 0.5
+    done
+    sleep 0.5
+    for round in 1 2 3; do
+        echo "mouse_move 120 -90"; sleep 0.3
+        echo "mouse_move -90 120"; sleep 0.3
+        echo "mouse_button 1"; sleep 0.3
+        echo "mouse_button 0"; sleep 0.6
+    done
+    sleep 2
     echo "quit"
-} | timeout 240 qemu-system-i386 \
+} | timeout 360 qemu-system-i386 \
         -cdrom "$ISO" \
         -display none \
         -serial "file:$SERIAL_LOG" \
@@ -634,6 +645,15 @@ if grep -q "mouse: moved to" "$SERIAL_LOG" \
     echo "PASS: PS/2 mouse reports movement and clicks"
 else
     echo "FAIL: mouse did not report movement/click" >&2
+    fail=1
+fi
+
+# PC speaker: beeptest plays an arpeggio via SYS_BEEP. CI can't hear audio,
+# but the run must complete with every tone syscall returning 0.
+if grep -q "beep: ok" "$SERIAL_LOG"; then
+    echo "PASS: PC speaker SYS_BEEP tones returned ok"
+else
+    echo "FAIL: SYS_BEEP did not complete" >&2
     fail=1
 fi
 

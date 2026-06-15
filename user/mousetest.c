@@ -11,7 +11,7 @@ void _start(void) {
     uprintf("mouse: start %d,%d\n", m0.x, m0.y);
 
     int moved = 0, clicked = 0;
-    for (int i = 0; i < 140; i++) { /* ~7s at 50ms */
+    for (int i = 0; i < 300; i++) { /* ~15s at 50ms; CI injects repeatedly */
         if (sys_mouse(&m) != 0)
             break;
         if (!moved && (m.x != m0.x || m.y != m0.y)) {

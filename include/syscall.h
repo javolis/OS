@@ -80,6 +80,9 @@
 #define SYS_MOUSE 35    /* ebx = struct mousestate* (writable); fills the
                          * cursor x/y and button bitmask. 0, or -1 if there
                          * is no mouse. */
+#define SYS_BEEP 36     /* ebx = frequency Hz (0 = silence now), ecx = duration
+                         * ms; plays a square-wave tone on the PC speaker then
+                         * silences it. Returns 0. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {
