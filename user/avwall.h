@@ -7,7 +7,10 @@
 
 #define AVW_NODES 72
 
-static inline void avwall_render(ugfx_t *g, unsigned seed, unsigned warm) {
+/* ox/oy shift the constellation (not the vignette) for a cursor-following
+ * parallax; pass 0,0 for a static field. */
+static inline void avwall_render(ugfx_t *g, unsigned seed, unsigned warm,
+                                 int ox, int oy) {
     int W = (int)g->width, H = (int)g->height;
     int cx = W / 2, cy = H / 2;
     int maxd2 = cx * cx + cy * cy;
@@ -36,9 +39,9 @@ static inline void avwall_render(ugfx_t *g, unsigned seed, unsigned warm) {
     unsigned s = seed ? seed : 1u;
     for (int i = 0; i < AVW_NODES; i++) {
         s = s * 1103515245u + 12345u;
-        nx[i] = (int)((s >> 16) % (unsigned)W);
+        nx[i] = (int)((s >> 16) % (unsigned)W) + ox;
         s = s * 1103515245u + 12345u;
-        ny[i] = (int)((s >> 16) % (unsigned)H);
+        ny[i] = (int)((s >> 16) % (unsigned)H) + oy;
     }
 
     unsigned linec = 0x00c8641e; /* dim orange mesh */

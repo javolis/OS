@@ -9,7 +9,7 @@ void _start(void) {
         uprintf("avwall: no framebuffer\n");
         sys_exit(0);
     }
-    avwall_render(&g, 0x12345678, 0x281404);
+    avwall_render(&g, 0x12345678, 0x281404, 0, 0);
     int orange = 0;
     for (int y = 0; y < (int)g.height && !orange; y += 2)
         for (int x = 0; x < (int)g.width; x += 2) {
