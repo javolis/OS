@@ -35,7 +35,7 @@ static const struct app bar[] = {
 static const struct app pal[] = {
     {"graphics demo", "gfxdemo.elf"}, {"input demo", "inputdemo.elf"},
     {"system info", "sysinfo.elf"},   {"date", "date.elf"},
-    {"files", "ls.elf"},              {"network", "netcap.elf"},
+    {"files", "files.elf"},           {"network", "netcap.elf"},
     {"shell", "ush.elf"},
 };
 #define NPAL ((int)(sizeof(pal) / sizeof(pal[0])))
