@@ -264,8 +264,16 @@ static int spawn_from_user(uint32_t cmdline_uaddr, int make_fg,
 #define LIN_EXIT 1
 #define LIN_READ 3
 #define LIN_WRITE 4
+#define LIN_GETPID 20
+#define LIN_GETUID 24
+#define LIN_IOCTL 54
+#define LIN_GETPPID 64
+#define LIN_GETEUID 49
 #define LIN_BRK 45
+#define LIN_UNAME 122
 #define LIN_WRITEV 146
+#define LIN_NANOSLEEP 162
+#define LIN_SET_TID_ADDRESS 258
 #define LIN_EXIT_GROUP 252
 
 static void linux_syscall_handle(struct registers *regs) {
@@ -295,9 +303,80 @@ static void linux_syscall_handle(struct registers *regs) {
         return;
     }
 
+    case LIN_WRITEV: {
+        uint32_t fd = regs->ebx, iov = regs->ecx, cnt = regs->edx;
+        if (cnt == 0) {
+            regs->eax = 0;
+            return;
+        }
+        if (!user_range_ok(iov, cnt * 8, 0)) {
+            regs->eax = (uint32_t)(-14);
+            return;
+        }
+        if (fd != 1 && fd != 2) {
+            regs->eax = (uint32_t)(-9);
+            return;
+        }
+        const uint32_t *v = (const uint32_t *)iov;
+        uint32_t total = 0;
+        for (uint32_t i = 0; i < cnt; i++) {
+            uint32_t base = v[i * 2], len = v[i * 2 + 1];
+            if (len && user_range_ok(base, len, 0)) {
+                const char *p = (const char *)base;
+                for (uint32_t k = 0; k < len; k++)
+                    kprintf("%c", p[k]);
+                total += len;
+            }
+        }
+        regs->eax = total;
+        return;
+    }
+
     case LIN_READ:
         regs->eax = 0; /* EOF for now (no stdin wiring under the Linux ABI) */
         return;
+
+    case LIN_GETPID:
+    case LIN_SET_TID_ADDRESS:
+        regs->eax = sched_current_pid();
+        return;
+    case LIN_GETPPID:
+    case LIN_GETUID:
+    case LIN_GETEUID:
+        regs->eax = 0;
+        return;
+    case LIN_IOCTL:
+        regs->eax = (uint32_t)(-25); /* -ENOTTY: not a terminal */
+        return;
+    case LIN_NANOSLEEP: {
+        if (user_range_ok(regs->ebx, 8, 0)) {
+            const uint32_t *t = (const uint32_t *)regs->ebx;
+            uint32_t ms = t[0] * 1000 + t[1] / 1000000;
+            if (ms)
+                sched_sleep_current((ms + 9) / 10);
+        }
+        regs->eax = 0;
+        return;
+    }
+    case LIN_UNAME: {
+        if (!user_range_ok(regs->ebx, 390, 1)) {
+            regs->eax = (uint32_t)(-14);
+            return;
+        }
+        char *u = (char *)regs->ebx;
+        for (int i = 0; i < 390; i++)
+            u[i] = 0;
+        static const char *const f[6] = {"Avolis", "avolis",   "0.1",
+                                         "#1",     "i686",     ""};
+        for (int fi = 0; fi < 6; fi++) {
+            const char *s = f[fi];
+            char *d = u + fi * 65;
+            for (int j = 0; s[j] && j < 64; j++)
+                d[j] = s[j];
+        }
+        regs->eax = 0;
+        return;
+    }
 
     case LIN_BRK: {
         /* Linux brk: ebx=0 queries the break; otherwise tries to set it.
