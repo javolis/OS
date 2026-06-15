@@ -916,6 +916,35 @@ void syscall_handle(struct registers *regs) {
         return;
     }
 
+    case SYS_AUDIO_REC: {
+        uint32_t count = regs->ecx;
+        if (!ac97_present()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (count == 0) {
+            regs->eax = 0;
+            return;
+        }
+        if (!user_range_ok(regs->ebx, count * 2, 1)) { /* writable */
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int n = ac97_capture_start(count);
+        uint32_t guard = (uint32_t)n / 480 + 80;
+        while (guard-- > 0) {
+            if (!ac97_capture_busy()) {
+                kprintf("ac97: capture drained %d samples\n", n);
+                break;
+            }
+            sched_sleep_current(1);
+        }
+        ac97_capture_stop();
+        ac97_capture_read((int16_t *)regs->ebx, (uint32_t)n);
+        regs->eax = (uint32_t)n;
+        return;
+    }
+
     case SYS_TIME: {
         if (!user_range_writable(regs->ebx, sizeof(struct systime))) {
             regs->eax = (uint32_t)-1;
