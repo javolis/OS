@@ -102,6 +102,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc r e c t e s t dot e l f ret \
                r u n spc f i l e s dot e l f spc t e s t ret \
                r u n spc s y s m o n dot e l f spc t e s t ret \
+               r u n spc c a l e n d a r dot e l f spc t e s t ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -703,6 +704,15 @@ if grep -q "sysmon: listed" "$SERIAL_LOG" \
     echo "PASS: System Monitor enumerated the process table"
 else
     echo "FAIL: System Monitor (SYS_PS) did not enumerate correctly" >&2
+    fail=1
+fi
+
+# Clock & Calendar: renders the live clock + month grid from the RTC.
+if grep -q "calendar: ok" "$SERIAL_LOG" \
+        && grep -q "calendar: .* 20" "$SERIAL_LOG"; then
+    echo "PASS: Clock & Calendar rendered from the RTC"
+else
+    echo "FAIL: Clock & Calendar did not render" >&2
     fail=1
 fi
 
