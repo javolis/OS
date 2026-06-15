@@ -4,6 +4,7 @@
  * the data region, then reads files by walking their 16-bit cluster chain.
  * Enough to list the root directory and load files (e.g. apps the user copied
  * onto the disk from their host). Long file names are ignored; 8.3 only. */
+#include <stddef.h>
 #include <stdint.h>
 
 #include "ata.h"
