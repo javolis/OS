@@ -79,6 +79,7 @@ static int state = LOCK, pos = TB_BOTTOM, focus, sel, srow, wp;
 static int scat;       /* selected settings category */
 static int sdetail;    /* 0 = sidebar focused, 1 = detail pane focused */
 static int timefmt;    /* 0 = 24-hour clock, 1 = 12-hour */
+static int volume = 80; /* AC'97 master volume percent */
 static char query[32];
 static int qlen;
 static int par_ox, par_oy; /* constellation parallax offset */
@@ -88,6 +89,8 @@ static int cat_rows(int c) {
     if (c == CAT_PERSONAL)
         return 2;
     if (c == CAT_DATETIME)
+        return 1;
+    if (c == CAT_SOUND)
         return 1;
     return 0;
 }
@@ -275,6 +278,13 @@ static void settings_change(int c, int row, int dir) {
     } else if (c == CAT_DATETIME) {
         timefmt = !timefmt;
         uprintf("avolis: timefmt %s\n", timefmt ? "12h" : "24h");
+    } else if (c == CAT_SOUND) {
+        volume += dir * 5;
+        if (volume < 0)
+            volume = 0;
+        if (volume > 100)
+            volume = 100;
+        sys_audio_volume(volume);
     }
 }
 
@@ -314,10 +324,20 @@ static int settings_content(ugfx_t *g, int c, char labels[][24],
         put_s(values[n++], "boot (GRUB)");
     } else if (c == CAT_SOUND) {
         int16_t probe;
+        int have = (sys_audio(&probe, 0) == 0);
         put_s(labels[n], "Output device");
-        put_s(values[n++], sys_audio(&probe, 0) == 0 ? "AC'97 codec" : "None");
+        put_s(values[n++], have ? "AC'97 codec" : "None");
         put_s(labels[n], "Format");
         put_s(values[n++], "48 kHz 16-bit");
+        put_s(labels[n], "Volume");
+        if (have) {
+            char *p = put_i(values[n], volume);
+            *p++ = '%';
+            *p = '\0';
+        } else {
+            put_s(values[n], "n/a");
+        }
+        n++;
     } else if (c == CAT_NETWORK) {
         struct netinfo ni;
         int up = (sys_netinfo(&ni) == 0);

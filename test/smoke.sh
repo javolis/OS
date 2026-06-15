@@ -669,10 +669,11 @@ fi
 # run without faulting, and the syscall must report the samples it played.
 if grep -q "ac97: ready" "$SERIAL_LOG" \
         && grep -q "audio: played 9600 samples" "$SERIAL_LOG" \
+        && grep -q "audio: volume 60" "$SERIAL_LOG" \
         && grep -q "audio: ok" "$SERIAL_LOG"; then
-    echo "PASS: AC'97 PCM playback ran via DMA"
+    echo "PASS: AC'97 PCM playback + volume control ran"
 else
-    echo "FAIL: AC'97 playback did not complete" >&2
+    echo "FAIL: AC'97 playback/volume did not complete" >&2
     fail=1
 fi
 
