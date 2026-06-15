@@ -100,6 +100,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc b e e p t e s t dot e l f ret \
                r u n spc a u d i o t e s t dot e l f ret \
                r u n spc r e c t e s t dot e l f ret \
+               r u n spc f i l e s dot e l f spc t e s t ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -680,6 +681,17 @@ if grep -q "rec: captured 9600 samples" "$SERIAL_LOG" \
     echo "PASS: AC'97 PCM capture ran via DMA"
 else
     echo "FAIL: AC'97 capture did not complete" >&2
+    fail=1
+fi
+
+# Files app: scans the ramfs+initrd, renders the list, opens notes.txt in the
+# viewer. CI checks it enumerated entries and read the text file back.
+if grep -q "files: listed" "$SERIAL_LOG" \
+        && grep -q "files: viewed notes.txt" "$SERIAL_LOG" \
+        && grep -q "files: ok" "$SERIAL_LOG"; then
+    echo "PASS: Files app listed entries and opened a text file"
+else
+    echo "FAIL: Files app did not list/open correctly" >&2
     fail=1
 fi
 
