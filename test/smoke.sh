@@ -98,6 +98,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc a v u i t e s t dot e l f ret \
                r u n spc a v w a l l t e s t dot e l f ret \
                r u n spc b e e p t e s t dot e l f ret \
+               r u n spc a u d i o t e s t dot e l f ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s d esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -157,6 +158,8 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
         -monitor stdio \
         -netdev user,id=net0,guestfwd=tcp:10.0.2.100:9-tcp:127.0.0.1:12345 \
         -device rtl8139,netdev=net0 \
+        -audiodev none,id=snd0 \
+        -device AC97,audiodev=snd0 \
         -no-reboot >/dev/null 2>&1
 
 echo "----- serial output -----"
@@ -654,6 +657,18 @@ if grep -q "beep: ok" "$SERIAL_LOG"; then
     echo "PASS: PC speaker SYS_BEEP tones returned ok"
 else
     echo "FAIL: SYS_BEEP did not complete" >&2
+    fail=1
+fi
+
+# AC'97 PCM output: audiotest synthesizes a tone and plays it via bus-master
+# DMA. CI can't hear it, but the codec must be found, the playback path must
+# run without faulting, and the syscall must report the samples it played.
+if grep -q "ac97: ready" "$SERIAL_LOG" \
+        && grep -q "audio: played 9600 samples" "$SERIAL_LOG" \
+        && grep -q "audio: ok" "$SERIAL_LOG"; then
+    echo "PASS: AC'97 PCM playback ran via DMA"
+else
+    echo "FAIL: AC'97 playback did not complete" >&2
     fail=1
 fi
 

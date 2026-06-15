@@ -43,7 +43,7 @@ USER_ELFS := user/hello_a.elf user/hello_b.elf user/clock.elf \
              user/envtest.elf user/envchild.elf user/badptr.elf \
              user/hardcap.elf user/aafonttest.elf user/avuitest.elf \
              user/avwalltest.elf user/avolis.elf user/mousetest.elf \
-             user/beeptest.elf
+             user/beeptest.elf user/audiotest.elf
 INITRD_FILES := $(USER_ELFS) user/notes.txt user/demo.ush \
                 user/words.txt user/tools.ush
 INITRD    := initrd.tar

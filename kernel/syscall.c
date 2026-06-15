@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ac97.h"
 #include "dhcp.h"
 #include "dns.h"
 #include "env.h"
@@ -882,6 +883,36 @@ void syscall_handle(struct registers *regs) {
             sched_sleep_current((ms + 9) / 10); /* others run meanwhile */
         speaker_off();
         regs->eax = 0;
+        return;
+    }
+
+    case SYS_AUDIO: {
+        uint32_t count = regs->ecx;
+        if (!ac97_present()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        if (count == 0) {
+            regs->eax = 0;
+            return;
+        }
+        if (!user_range_ok(regs->ebx, count * 2, 0)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        int n = ac97_play((const int16_t *)regs->ebx, count);
+        /* Block this task (others run) until the DMA drains, bounded so a
+         * stalled engine can't hang the caller. ~one tick is 10 ms. */
+        uint32_t guard = (uint32_t)n / 480 + 80;
+        while (guard-- > 0) {
+            if (!ac97_busy()) {
+                kprintf("ac97: drained %d samples\n", n);
+                break;
+            }
+            sched_sleep_current(1);
+        }
+        ac97_stop();
+        regs->eax = (uint32_t)n;
         return;
     }
 

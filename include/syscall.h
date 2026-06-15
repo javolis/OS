@@ -83,6 +83,10 @@
 #define SYS_BEEP 36     /* ebx = frequency Hz (0 = silence now), ecx = duration
                          * ms; plays a square-wave tone on the PC speaker then
                          * silences it. Returns 0. */
+#define SYS_AUDIO 37    /* ebx = int16 PCM samples (user), ecx = sample count
+                         * (interleaved L,R, 48 kHz, 16-bit stereo). Plays them
+                         * via AC'97 DMA and blocks until drained. Returns the
+                         * number of samples played, or -1 if no codec. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct dirent {

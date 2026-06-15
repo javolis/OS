@@ -220,6 +220,18 @@ static inline int sys_beep(int freq, int ms) {
     return ret;
 }
 
+/* Play `count` 16-bit PCM samples (interleaved L,R, 48 kHz stereo) through
+ * the AC'97 codec. Blocks until the DMA drains. Returns the number of
+ * samples played, or -1 if there is no audio device. */
+static inline int sys_audio(const int16_t *samples, int count) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(37), "b"(samples), "c"(count)
+                     : "memory");
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {
