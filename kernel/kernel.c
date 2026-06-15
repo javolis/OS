@@ -4,6 +4,7 @@
 #include "ac97.h"
 #include "arp.h"
 #include "ata.h"
+#include "fat.h"
 #include "dhcp.h"
 #include "fb.h"
 #include "gdt.h"
@@ -117,8 +118,16 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
     /* AC'97 audio controller (PCM output via bus-master DMA). */
     ac97_init();
 
-    /* ATA disk (persistent storage), if one is attached. */
+    /* ATA disk (persistent storage), if one is attached, and its FAT volume. */
     ata_init();
+    if (fat_mount() == 0) {
+        char b[64];
+        int n = fat_read_file("HELLO.TXT", b, 63);
+        if (n > 0) {
+            b[n] = '\0';
+            kprintf("fat: read HELLO.TXT: %s", b);
+        }
+    }
 
     /* Framebuffer: if the bootloader gave us a linear 32bpp surface, switch
      * the console to it so the shell renders graphically (and on UEFI VMs
