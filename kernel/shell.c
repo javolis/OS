@@ -223,22 +223,16 @@ void shell_run(void) {
                 }
                 fname[n] = '\0';
 
-                uint32_t size;
-                const char *img = initrd_find(fname, &size);
-                if (!img) {
+                /* Foreground is assigned inside spawn, atomically with the
+                 * task becoming runnable; exit hands it back. Resolves from
+                 * the initrd first, then the FAT disk. */
+                int pid = process_spawn_named(fname, rest, !background, 0, 0);
+                if (pid < 0) {
                     kprintf("run: %s: not found (try 'ls')\n", fname);
-                } else {
-                    /* Foreground is assigned inside spawn, atomically with
-                     * the task becoming runnable; exit hands it back. */
-                    int pid = process_spawn(img, img + size, rest,
-                                            !background, 0, 0);
-                    if (pid < 0) {
-                        kprintf("run: %s: spawn failed\n", fname);
-                    } else if (!background) {
-                        while (sched_pid_alive((uint32_t)pid))
-                            __asm__ volatile("hlt");
-                        sched_reap();
-                    }
+                } else if (!background) {
+                    while (sched_pid_alive((uint32_t)pid))
+                        __asm__ volatile("hlt");
+                    sched_reap();
                 }
             }
         } else if (streq(cmd, "kill")) {

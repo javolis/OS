@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 #include "elf.h"
+#include "fat.h"
+#include "initrd.h"
+#include "kheap.h"
 #include "kprintf.h"
 #include "memlayout.h"
 #include "paging.h"
@@ -120,4 +123,27 @@ int process_spawn(const char *image_start, const char *image_end,
     }
     kprintf("[pid %d] spawned (ELF entry %08lx)\n", pid, entry);
     return pid;
+}
+
+int process_spawn_named(const char *fname, const char *cmdline, int foreground,
+                        struct file *in, struct file *out) {
+    /* Initrd first (built-in apps), then the FAT disk (installed/downloaded
+     * apps copied onto the volume). */
+    uint32_t size;
+    const char *img = initrd_find(fname, &size);
+    if (img)
+        return process_spawn(img, img + size, cmdline, foreground, in, out);
+
+    int fsz = fat_size(fname);
+    if (fsz > 0) {
+        char *buf = kmalloc((uint32_t)fsz);
+        if (!buf)
+            return -1;
+        int pid = -1;
+        if (fat_read_file(fname, buf, (uint32_t)fsz) == fsz)
+            pid = process_spawn(buf, buf + fsz, cmdline, foreground, in, out);
+        kfree(buf);
+        return pid;
+    }
+    return -1;
 }

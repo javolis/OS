@@ -253,11 +253,7 @@ static int spawn_from_user(uint32_t cmdline_uaddr, int make_fg,
     }
     fname[n] = '\0';
 
-    uint32_t size;
-    const char *img = initrd_find(fname, &size);
-    if (!img)
-        return -1;
-    return process_spawn(img, img + size, cmdline, make_fg, in, out);
+    return process_spawn_named(fname, cmdline, make_fg, in, out);
 }
 
 void syscall_handle(struct registers *regs) {
