@@ -286,6 +286,25 @@ static inline int sys_mouse_speed(int pct) {
     return ret;
 }
 
+/* Read/write a file on the FAT disk (persists across reboots). Names are 8.3.
+ * Read returns bytes read; write returns bytes written; -1 on failure. */
+static inline int sys_disk_read(const char *name, void *buf, int max) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(44), "b"(name), "c"(buf), "d"(max)
+                     : "memory");
+    return ret;
+}
+static inline int sys_disk_write(const char *name, const void *buf, int len) {
+    int ret;
+    __asm__ volatile("int $0x80"
+                     : "=a"(ret)
+                     : "a"(45), "b"(name), "c"(buf), "d"(len)
+                     : "memory");
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

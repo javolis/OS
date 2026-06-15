@@ -16,3 +16,7 @@ int fat_read_file(const char *name, void *buf, uint32_t maxlen);
 
 /* Size of a root file in bytes, or -1 if not found. */
 int fat_size(const char *name);
+
+/* Create or overwrite a root file with `len` bytes from buf. Returns the
+ * bytes written, or -1 on failure (no volume, disk/dir full). */
+int fat_write_file(const char *name, const void *buf, uint32_t len);

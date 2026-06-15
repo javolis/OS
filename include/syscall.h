@@ -99,6 +99,10 @@
 #define SYS_REBOOT 42   /* restart the machine (does not return). */
 #define SYS_MOUSE_SPEED 43 /* ebx = pointer speed percent (25-400); scales the
                             * mouse deltas. Returns the clamped value. */
+#define SYS_DISK_READ 44 /* ebx = name, ecx = buf (writable), edx = max; reads
+                          * a FAT-disk file. Returns bytes read, or -1. */
+#define SYS_DISK_WRITE 45 /* ebx = name, ecx = buf, edx = len; creates/over-
+                           * writes a FAT-disk file. Returns len, or -1. */
 
 /* Keep in sync with the userland copy in user/usys.h. */
 struct procinfo {

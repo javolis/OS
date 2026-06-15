@@ -6,6 +6,7 @@
 #include "dhcp.h"
 #include "dns.h"
 #include "env.h"
+#include "fat.h"
 #include "fb.h"
 #include "file.h"
 #include "icmp.h"
@@ -966,6 +967,28 @@ void syscall_handle(struct registers *regs) {
     case SYS_MOUSE_SPEED:
         regs->eax = (uint32_t)mouse_set_speed((int)regs->ebx);
         return;
+
+    case SYS_DISK_READ: {
+        if (!user_string_ok(regs->ebx) ||
+            !user_range_ok(regs->ecx, regs->edx, 1)) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)fat_read_file((const char *)regs->ebx,
+                                            (void *)regs->ecx, regs->edx);
+        return;
+    }
+
+    case SYS_DISK_WRITE: {
+        if (!user_string_ok(regs->ebx) ||
+            (regs->edx > 0 && !user_range_ok(regs->ecx, regs->edx, 0))) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        regs->eax = (uint32_t)fat_write_file(
+            (const char *)regs->ebx, (const void *)regs->ecx, regs->edx);
+        return;
+    }
 
     case SYS_POWEROFF:
         power_off();

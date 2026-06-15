@@ -119,6 +119,7 @@ echo "Booting $ISO in QEMU (headless), then typing 'help<enter>'..."
                r u n spc c a l e n d a r dot e l f spc t e s t ret \
                r u n spc e d i t dot e l f spc t e s t ret \
                r u n spc d i s k a p p dot e l f ret \
+               r u n spc p e r s i s t dot e l f spc w ret \
                r u n spc a v o l i s dot e l f spc t e s t ret \
                ret s down down down down ret d esc esc p ret ret slash d a t e ret q \
                r u n spc k i l l t e s t dot e l f ret \
@@ -774,6 +775,15 @@ else
     fail=1
 fi
 
+# FAT write happened in this boot (persist.elf w); the cross-reboot read is
+# verified in the dedicated persistence lane below.
+if grep -q "persist: wrote marker" "$SERIAL_LOG"; then
+    echo "PASS: wrote a file to the FAT disk"
+else
+    echo "FAIL: FAT write failed" >&2
+    fail=1
+fi
+
 # Avolis shell, full v1 flow: unlock -> settings (change wallpaper, Esc back,
 # which also exercises the new Esc keymap) -> move taskbar -> applications
 # overview (launch gfxdemo) -> command palette (type "date", launch date.elf)
@@ -1076,6 +1086,34 @@ else
     echo "FAIL: history recall did not re-run 'help' (seen ${help_count}x)" >&2
     fail=1
 fi
+
+# Persistence: a SECOND boot reusing the same disk image must see the file the
+# first boot wrote (persist.elf w) - proving FAT writes survive a reboot.
+echo "----- persistence test (second boot, same disk) -----"
+PERSIST_LOG=$(mktemp)
+{
+    sleep 8
+    for k in r u n spc p e r s i s t dot e l f spc r ret; do
+        echo "sendkey $k"
+        sleep 0.2
+    done
+    sleep 3
+    echo "quit"
+} | timeout 120 qemu-system-i386 \
+        -cdrom "$ISO" \
+        -boot d \
+        -drive file="$DATA_IMG",format=raw,if=ide,index=0 \
+        -display none \
+        -serial "file:$PERSIST_LOG" \
+        -monitor stdio \
+        -no-reboot >/dev/null 2>&1
+if grep -q "persist: read AVOLIS_PERSIST_OK" "$PERSIST_LOG"; then
+    echo "PASS: a file written in boot 1 persisted to boot 2"
+else
+    echo "FAIL: FAT write did not persist across reboot" >&2
+    fail=1
+fi
+rm -f "$PERSIST_LOG"
 
 # Power: a fresh short boot. The 'shutdown' command must power the machine off
 # via ACPI (QEMU exits on its own), so the follow-up echo marker must never run.
