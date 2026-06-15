@@ -279,6 +279,13 @@ static inline void sys_reboot(void) {
     __asm__ volatile("int $0x80" : : "a"(42));
 }
 
+/* Set the mouse pointer speed (percent, 25-400). Returns the clamped value. */
+static inline int sys_mouse_speed(int pct) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(43), "b"(pct));
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {

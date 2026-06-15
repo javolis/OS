@@ -14,3 +14,7 @@ int mouse_present(void);
 
 /* Current cursor position (clamped to the screen) and button bitmask. */
 void mouse_state(int *x, int *y, uint32_t *buttons);
+
+/* Pointer speed as a percent (deltas are scaled by it). Clamped to 25-400;
+ * returns the clamped value. */
+int mouse_set_speed(int pct);

@@ -649,10 +649,11 @@ fi
 # PS/2 mouse: CI injects movement + a click via the QEMU monitor; mousetest
 # reads SYS_MOUSE and reports the cursor moving and the left button.
 if grep -q "mouse: moved to" "$SERIAL_LOG" \
-        && grep -q "mouse: button left" "$SERIAL_LOG"; then
-    echo "PASS: PS/2 mouse reports movement and clicks"
+        && grep -q "mouse: button left" "$SERIAL_LOG" \
+        && grep -q "mouse: speed 100" "$SERIAL_LOG"; then
+    echo "PASS: PS/2 mouse reports movement, clicks and speed control"
 else
-    echo "FAIL: mouse did not report movement/click" >&2
+    echo "FAIL: mouse did not report movement/click/speed" >&2
     fail=1
 fi
 
