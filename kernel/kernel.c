@@ -14,6 +14,7 @@
 #include "kheap.h"
 #include "kprintf.h"
 #include "memlayout.h"
+#include "mouse.h"
 #include "multiboot.h"
 #include "net.h"
 #include "paging.h"
@@ -152,6 +153,7 @@ void kernel_main(uint32_t magic, uint32_t mbi_phys) {
 
     timer_init(100);
     keyboard_init();
+    mouse_init();
     __asm__ volatile("sti");
 
     /* Prove hardware IRQs fire: wait for the PIT to tick 10 times (100 ms).

@@ -13,6 +13,7 @@
 #include "keyboard.h"
 #include "kprintf.h"
 #include "memlayout.h"
+#include "mouse.h"
 #include "net.h"
 #include "paging.h"
 #include "pipe.h"
@@ -846,6 +847,23 @@ void syscall_handle(struct registers *regs) {
         }
         int c = keyboard_trygetchar();
         regs->eax = (c < 0) ? (uint32_t)-1 : (uint32_t)(unsigned char)c;
+        return;
+    }
+
+    case SYS_MOUSE: {
+        if (!user_range_writable(regs->ebx, sizeof(struct mousestate)) ||
+            !mouse_present()) {
+            regs->eax = (uint32_t)-1;
+            return;
+        }
+        struct mousestate *ms = (struct mousestate *)regs->ebx;
+        int x, y;
+        uint32_t b;
+        mouse_state(&x, &y, &b);
+        ms->x = x;
+        ms->y = y;
+        ms->buttons = b;
+        regs->eax = 0;
         return;
     }
 

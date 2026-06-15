@@ -193,6 +193,24 @@ static inline int sys_trygetkey(void) {
     return ret;
 }
 
+#define MOUSE_LEFT 0x01
+#define MOUSE_RIGHT 0x02
+#define MOUSE_MIDDLE 0x04
+
+/* Keep in sync with the kernel's struct mousestate in include/syscall.h. */
+struct mousestate {
+    int x;
+    int y;
+    unsigned int buttons;
+};
+
+/* Read the cursor position + button bitmask. 0 on success, -1 if no mouse. */
+static inline int sys_mouse(struct mousestate *out) {
+    int ret;
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(35), "b"(out) : "memory");
+    return ret;
+}
+
 /* Send an ICMP echo to an IPv4 address (host byte order: a<<24|b<<16|c<<8|d)
  * and wait for the reply. Returns the round-trip time in ms, or -1. */
 static inline int sys_ping(unsigned int ip) {
