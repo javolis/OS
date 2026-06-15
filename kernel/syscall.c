@@ -254,10 +254,76 @@ static int spawn_from_user(uint32_t cmdline_uaddr, int make_fg,
     }
     fname[n] = '\0';
 
-    return process_spawn_named(fname, cmdline, make_fg, in, out);
+    return process_spawn_named(fname, cmdline, make_fg, in, out, 0);
+}
+
+/* Linux i386 syscall translation. Linux binaries do int 0x80 with their own
+ * numbers (eax) and args in ebx/ecx/edx/esi/edi, so a task flagged Linux-ABI
+ * is routed here instead of to the native dispatch. Just enough to run simple
+ * freestanding/static programs; unimplemented calls return -ENOSYS. */
+#define LIN_EXIT 1
+#define LIN_READ 3
+#define LIN_WRITE 4
+#define LIN_BRK 45
+#define LIN_WRITEV 146
+#define LIN_EXIT_GROUP 252
+
+static void linux_syscall_handle(struct registers *regs) {
+    switch (regs->eax) {
+    case LIN_EXIT:
+    case LIN_EXIT_GROUP:
+        task_exit(regs->ebx);
+
+    case LIN_WRITE: {
+        uint32_t fd = regs->ebx, buf = regs->ecx, len = regs->edx;
+        if (len == 0) {
+            regs->eax = 0;
+            return;
+        }
+        if (!user_range_ok(buf, len, 0)) {
+            regs->eax = (uint32_t)(-14); /* -EFAULT */
+            return;
+        }
+        if (fd == 1 || fd == 2) { /* stdout/stderr -> console */
+            const char *p = (const char *)buf;
+            for (uint32_t i = 0; i < len; i++)
+                kprintf("%c", p[i]);
+            regs->eax = len;
+        } else {
+            regs->eax = (uint32_t)(-9); /* -EBADF */
+        }
+        return;
+    }
+
+    case LIN_READ:
+        regs->eax = 0; /* EOF for now (no stdin wiring under the Linux ABI) */
+        return;
+
+    case LIN_BRK: {
+        /* Linux brk: ebx=0 queries the break; otherwise tries to set it.
+         * Back it with the per-process heap window. */
+        uint32_t cur = sched_brk();
+        if (regs->ebx == 0) {
+            regs->eax = cur ? cur : USER_HEAP_BASE;
+            return;
+        }
+        regs->eax = regs->ebx; /* accept (lazy; pages fault in elsewhere) */
+        return;
+    }
+
+    default:
+        kprintf("linux: unimplemented syscall %lu\n",
+                (unsigned long)regs->eax);
+        regs->eax = (uint32_t)(-38); /* -ENOSYS */
+        return;
+    }
 }
 
 void syscall_handle(struct registers *regs) {
+    if (sched_current_linux()) {
+        linux_syscall_handle(regs);
+        return;
+    }
     switch (regs->eax) {
     case SYS_EXIT:
         task_exit(regs->ebx);

@@ -174,7 +174,7 @@ void shell_run(void) {
 
         if (streq(cmd, "help"))
             kprintf("commands: help echo clear ticks meminfo sleep uptime "
-                    "history ls run ps kill date shutdown reboot\n");
+                    "history ls run linux ps kill date shutdown reboot\n");
         else if (streq(cmd, "shutdown"))
             power_off();
         else if (streq(cmd, "reboot"))
@@ -226,10 +226,32 @@ void shell_run(void) {
                 /* Foreground is assigned inside spawn, atomically with the
                  * task becoming runnable; exit hands it back. Resolves from
                  * the initrd first, then the FAT disk. */
-                int pid = process_spawn_named(fname, rest, !background, 0, 0);
+                int pid =
+                    process_spawn_named(fname, rest, !background, 0, 0, 0);
                 if (pid < 0) {
                     kprintf("run: %s: not found (try 'ls')\n", fname);
                 } else if (!background) {
+                    while (sched_pid_alive((uint32_t)pid))
+                        __asm__ volatile("hlt");
+                    sched_reap();
+                }
+            }
+        } else if (streq(cmd, "linux")) {
+            /* Run a program under the Linux i386 syscall ABI (foreground). */
+            if (*rest == '\0') {
+                kprintf("usage: linux <file>\n");
+            } else {
+                char fname[32];
+                uint32_t n = 0;
+                while (rest[n] && rest[n] != ' ' && n + 1 < sizeof(fname)) {
+                    fname[n] = rest[n];
+                    n++;
+                }
+                fname[n] = '\0';
+                int pid = process_spawn_named(fname, rest, 1, 0, 0, 1);
+                if (pid < 0) {
+                    kprintf("linux: %s: not found\n", fname);
+                } else {
                     while (sched_pid_alive((uint32_t)pid))
                         __asm__ volatile("hlt");
                     sched_reap();

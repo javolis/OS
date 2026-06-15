@@ -67,9 +67,33 @@ static uint32_t build_user_stack(uint8_t *stk, const char *cmdline) {
     return USER_STACK_VADDR + top;
 }
 
-int process_spawn(const char *image_start, const char *image_end,
-                  const char *cmdline, int foreground, struct file *in,
-                  struct file *out) {
+/* Linux i386 entry stack: esp points at argc, followed by argv[], a NULL
+ * terminator, an (empty) envp, then an auxv whose only entry is AT_NULL.
+ * Freestanding binaries that ignore their arguments are happy with this. */
+static uint32_t build_linux_stack(uint8_t *stk, const char *cmdline) {
+    uint32_t top = FRAME_SIZE;
+    uint32_t len = 0;
+    while (cmdline[len] && cmdline[len] != ' ')
+        len++;
+    top -= len + 1;
+    for (uint32_t i = 0; i < len; i++)
+        stk[top + i] = (uint8_t)cmdline[i];
+    stk[top + len] = '\0';
+    uint32_t arg0 = USER_STACK_VADDR + top;
+
+    top &= ~15u;
+    uint32_t items[6] = {1, arg0, 0, 0, 0, 0}; /* argc, argv0, NULL, envp NULL,
+                                                  AT_NULL type, AT_NULL value */
+    top -= 4 * 6;
+    uint32_t *vec = (uint32_t *)(stk + top);
+    for (int i = 0; i < 6; i++)
+        vec[i] = items[i];
+    return USER_STACK_VADDR + top; /* esp -> argc */
+}
+
+static int spawn_image(const char *image_start, const char *image_end,
+                       const char *cmdline, int foreground, struct file *in,
+                       struct file *out, int linux_abi) {
     uint32_t size = (uint32_t)(image_end - image_start);
 
     uint32_t dir = paging_new_address_space();
@@ -89,7 +113,8 @@ int process_spawn(const char *image_start, const char *image_end,
     for (uint32_t i = 0; i < FRAME_SIZE; i++)
         stk[i] = 0;
 
-    uint32_t user_esp = build_user_stack(stk, cmdline);
+    uint32_t user_esp = linux_abi ? build_linux_stack(stk, cmdline)
+                                  : build_user_stack(stk, cmdline);
     paging_map_user_in(dir, USER_STACK_VADDR, stack_frame, 1);
 
     /* Map additional zeroed pages below the top so the stack can grow. */
@@ -115,6 +140,8 @@ int process_spawn(const char *image_start, const char *image_end,
     }
     name[n] = '\0';
 
+    if (linux_abi)
+        sched_arm_linux(); /* the task created below is a Linux process */
     int pid =
         sched_spawn_user(dir, entry, user_esp, foreground, name, in, out);
     if (pid < 0) {
@@ -125,14 +152,21 @@ int process_spawn(const char *image_start, const char *image_end,
     return pid;
 }
 
+int process_spawn(const char *image_start, const char *image_end,
+                  const char *cmdline, int foreground, struct file *in,
+                  struct file *out) {
+    return spawn_image(image_start, image_end, cmdline, foreground, in, out, 0);
+}
+
 int process_spawn_named(const char *fname, const char *cmdline, int foreground,
-                        struct file *in, struct file *out) {
+                        struct file *in, struct file *out, int linux_abi) {
     /* Initrd first (built-in apps), then the FAT disk (installed/downloaded
      * apps copied onto the volume). */
     uint32_t size;
     const char *img = initrd_find(fname, &size);
     if (img)
-        return process_spawn(img, img + size, cmdline, foreground, in, out);
+        return spawn_image(img, img + size, cmdline, foreground, in, out,
+                           linux_abi);
 
     int fsz = fat_size(fname);
     if (fsz > 0) {
@@ -141,7 +175,8 @@ int process_spawn_named(const char *fname, const char *cmdline, int foreground,
             return -1;
         int pid = -1;
         if (fat_read_file(fname, buf, (uint32_t)fsz) == fsz)
-            pid = process_spawn(buf, buf + fsz, cmdline, foreground, in, out);
+            pid = spawn_image(buf, buf + fsz, cmdline, foreground, in, out,
+                              linux_abi);
         kfree(buf);
         return pid;
     }

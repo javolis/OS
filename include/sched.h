@@ -76,6 +76,11 @@ void sched_ps(void);
  * past the end. state codes match struct procinfo (7 = the running task). */
 int sched_proc(int index, uint32_t *pid, uint32_t *state, char *name16);
 
+/* Mark the next spawned task as a Linux-ABI process (its int 0x80 goes to
+ * the Linux syscall translation layer). Cleared when consumed. */
+void sched_arm_linux(void);
+int sched_current_linux(void); /* 1 if the running task is a Linux process */
+
 /* Mark a ready/blocked user task zombie. 0 on success, -1 if no match. */
 int sched_kill(uint32_t pid);
 
