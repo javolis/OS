@@ -1,6 +1,7 @@
 /* usys.h — userland syscall stubs (int 0x80).
  * Convention: eax = syscall number (and return value), ebx = first arg. */
 #pragma once
+#include <stdint.h>
 
 static inline int sys_write(const char *s) {
     int ret;
