@@ -641,7 +641,8 @@ fi
 # which also exercises the new Esc keymap) -> move taskbar -> applications
 # overview (launch gfxdemo) -> command palette (type "date", launch date.elf)
 # -> quit. CI drives it all and checks every transition + both real launches.
-if grep -q "avolis: unlocked" "$SERIAL_LOG" \
+if grep -q "avolis: mouse ready" "$SERIAL_LOG" \
+        && grep -q "avolis: unlocked" "$SERIAL_LOG" \
         && grep -q "avolis: settings" "$SERIAL_LOG" \
         && grep -q "avolis: wallpaper ember" "$SERIAL_LOG" \
         && grep -q "avolis: taskbar left" "$SERIAL_LOG" \
@@ -650,7 +651,7 @@ if grep -q "avolis: unlocked" "$SERIAL_LOG" \
         && grep -q "avolis: palette" "$SERIAL_LOG" \
         && grep -q "avolis: run date.elf" "$SERIAL_LOG" \
         && grep -q "avolis: bye" "$SERIAL_LOG"; then
-    echo "PASS: Avolis v1 full flow (lock, settings, taskbar, apps, palette)"
+    echo "PASS: Avolis v1 full flow (lock, settings, taskbar, apps, palette, mouse)"
 else
     echo "FAIL: Avolis shell interactions broke" >&2
     fail=1
